@@ -33,7 +33,7 @@ class MusicServices extends getx.GetxService {
     'context': {
       'client': {
         "clientName": "WEB_REMIX",
-        "clientVersion": "1.20230213.01.00",
+        "clientVersion": "1.20240520.01.00",
       },
       'user': {}
     }
@@ -49,9 +49,9 @@ class MusicServices extends getx.GetxService {
 
   Future<void> init() async {
     //check visitor id in data base, if not generate one , set lang code
-    final date = DateTime.now();
-    _context['context']['client']['clientVersion'] =
-        "1.${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.01.00";
+    // final date = DateTime.now();
+    // _context['context']['client']['clientVersion'] =
+    //     "1.${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}.01.00";
     final signatureTimestamp = getDatestamp() - 1;
     _context['playbackContext'] = {
       'contentPlaybackContext': {'signatureTimestamp': signatureTimestamp},
@@ -654,7 +654,7 @@ class MusicServices extends getx.GetxService {
 
     results = nav(results, ['sectionListRenderer', 'contents']);
 
-    if (results.length == 1 && results[0]['itemSectionRenderer'] != null) {
+    if (results == null) {
       return searchResults;
     }
 
@@ -662,8 +662,19 @@ class MusicServices extends getx.GetxService {
 
     for (var res in results) {
       String category;
+      dynamic shelf;
       if (res['musicShelfRenderer'] != null) {
-        dynamic itemResults = res['musicShelfRenderer']['contents'];
+        shelf = res['musicShelfRenderer'];
+      } else if (res['itemSectionRenderer'] != null) {
+        shelf = res['itemSectionRenderer'];
+      } else if (res['musicCardShelfRenderer'] != null) {
+        shelf = res['musicCardShelfRenderer'];
+      }
+
+      if (shelf != null) {
+        dynamic itemResults = shelf['contents'];
+        if (itemResults == null) continue;
+
         String? typeFilter = filter;
         category = "mixed"; // Just a default value
         final mixedItems = parseSearchResults(itemResults,
@@ -681,9 +692,9 @@ class MusicServices extends getx.GetxService {
             }
           }
         } else {
-          category = nav(res, ['musicShelfRenderer', ...title_text]);
+          category = nav(shelf, [...title_text]) ?? "mixed";
           searchResults[category] = parseSearchResults(
-              res['musicShelfRenderer']['contents'],
+              itemResults,
               ['artist', 'playlist', 'song', 'video', 'station'],
               type,
               category);

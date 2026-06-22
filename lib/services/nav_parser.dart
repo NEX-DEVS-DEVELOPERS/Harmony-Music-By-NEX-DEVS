@@ -703,8 +703,8 @@ List<dynamic> parseSearchResults(List<dynamic> results,
     List<String> searchResultTypes, String? resultType, String category) {
   return results
       .map((result) {
-        return parseSearchResult(result['musicResponsiveListItemRenderer'],
-            searchResultTypes, resultType, category);
+        final data = result['musicResponsiveListItemRenderer'] ?? result;
+        return parseSearchResult(data, searchResultTypes, resultType, category);
       })
       .whereType<dynamic>()
       .toList();

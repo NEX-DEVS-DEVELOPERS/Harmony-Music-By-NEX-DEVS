@@ -1,12 +1,20 @@
 <div align="center">
 
-# ❗**This repository is no longer maintained.**
+# 🚀 **Revived & Maintained by NEX-DEVS**
 
 </div>
 
 <img src="https://github.com/anandnet/Harmony-Music/blob/main/cover.png" width="1200" >
 
 # Harmony Music
+
+We are excited to announce that **Harmony Music** is now under the active development and maintenance of **NEX-DEVS**.
+
+Our mission is to breathe new life into this project, ensuring it remains a top-tier, cross-platform music application. We are committed to:
+- **Continuous Improvement**: Regular updates, bug fixes, and feature enhancements.
+- **Open Source Integrity**: The project remains open source under the **GPL 3.0** license.
+- **Sustainability**: We plan to improve the project for our users and explore sustainable ways to support its long-term development while maintaining its open-source roots.
+
 A cross platform app for music streaming made with Flutter(Android, Windows, linux).
 
 # Features
