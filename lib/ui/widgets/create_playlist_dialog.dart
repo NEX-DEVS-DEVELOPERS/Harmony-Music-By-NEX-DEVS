@@ -54,33 +54,37 @@ class CreateNRenamePlaylistPopup extends StatelessWidget {
               ),
               if (isPipedLinked && !renamePlaylist)
                 Obx(
-                  () => Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Radio(
+                  () => RadioGroup<String>(
+                    groupValue: librPlstCntrller.playlistCreationMode.value,
+                    onChanged: (String? val) {
+                      if (val != null) {
+                        librPlstCntrller.changeCreationMode(val);
+                      }
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Radio(
                               value: "piped",
-                              groupValue:
-                                  librPlstCntrller.playlistCreationMode.value,
-                              onChanged: librPlstCntrller.changeCreationMode),
-                          Text("Piped".tr),
-                        ],
-                      ),
-                      const SizedBox(
-                        width: 15,
-                      ),
-                      Row(
-                        children: [
-                          Radio(
+                            ),
+                            Text("Piped".tr),
+                          ],
+                        ),
+                        const SizedBox(
+                          width: 15,
+                        ),
+                        Row(
+                          children: [
+                            const Radio(
                               value: "local",
-                              groupValue:
-                                  librPlstCntrller.playlistCreationMode.value,
-                              onChanged: librPlstCntrller.changeCreationMode),
-                          Text("local".tr),
-                        ],
-                      )
-                    ],
+                            ),
+                            Text("local".tr),
+                          ],
+                        )
+                      ],
+                    ),
                   ),
                 ),
               ModifiedTextField(

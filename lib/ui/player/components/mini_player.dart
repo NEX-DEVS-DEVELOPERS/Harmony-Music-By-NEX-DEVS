@@ -2,7 +2,7 @@ import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:harmonymusic/ui/screens/Settings/settings_screen_controller.dart';
-import 'package:ionicons/ionicons.dart';
+import 'package:ionicons_flutter/ionicons_flutter.dart';
 import 'package:widget_marquee/widget_marquee.dart';
 
 import '/ui/widgets/lyrics_dialog.dart';
@@ -202,7 +202,7 @@ class MiniPlayer extends StatelessWidget {
                                                       .textTheme
                                                       .titleLarge!
                                                       .color!
-                                                      .withOpacity(0.2),
+                                                      .withValues(alpha: 0.2),
                                             ))),
                                   ],
                                 ),
@@ -273,7 +273,7 @@ class MiniPlayer extends StatelessWidget {
                                                 .textTheme
                                                 .titleLarge!
                                                 .color!
-                                                .withOpacity(0.2)
+                                                .withValues(alpha: 0.2)
                                             : Theme.of(context)
                                                 .textTheme
                                                 .titleMedium!
@@ -301,7 +301,7 @@ class MiniPlayer extends StatelessWidget {
                                                   .textTheme
                                                   .titleLarge!
                                                   .color!
-                                                  .withOpacity(0.2),
+                                                  .withValues(alpha: 0.2),
                                         )),
                                     IconButton(
                                         iconSize: 20,

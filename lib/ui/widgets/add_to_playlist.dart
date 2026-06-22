@@ -62,35 +62,37 @@ class AddToPlaylist extends StatelessWidget {
               ),
               if (isPipedLinked)
                 Obx(
-                  () => Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Radio(
+                  () => RadioGroup<String>(
+                    groupValue: addToPlaylistController.playlistType.value,
+                    onChanged: (String? val) {
+                      if (val != null) {
+                        addToPlaylistController.changePlaylistType(val);
+                      }
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Radio(
                               value: "piped",
-                              groupValue:
-                                  addToPlaylistController.playlistType.value,
-                              onChanged:
-                                  addToPlaylistController.changePlaylistType),
-                          Text("Piped".tr),
-                        ],
-                      ),
-                      const SizedBox(
-                        width: 15,
-                      ),
-                      Row(
-                        children: [
-                          Radio(
+                            ),
+                            Text("Piped".tr),
+                          ],
+                        ),
+                        const SizedBox(
+                          width: 15,
+                        ),
+                        Row(
+                          children: [
+                            const Radio(
                               value: "local",
-                              groupValue:
-                                  addToPlaylistController.playlistType.value,
-                              onChanged:
-                                  addToPlaylistController.changePlaylistType),
-                          Text("local".tr),
-                        ],
-                      )
-                    ],
+                            ),
+                            Text("local".tr),
+                          ],
+                        )
+                      ],
+                    ),
                   ),
                 ),
               Container(
