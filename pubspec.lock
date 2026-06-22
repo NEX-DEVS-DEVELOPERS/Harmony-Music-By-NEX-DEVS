@@ -464,14 +464,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.3.0"
-  ionicons_flutter:
-    dependency: "direct main"
-    description:
-      name: ionicons_flutter
-      sha256: "1b29edeaf63c26c3a719ab3bb7bbf65ffad8d29aac28d918f0d6fdbdd2f374f6"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0"
   jni:
     dependency: "direct main"
     description:
