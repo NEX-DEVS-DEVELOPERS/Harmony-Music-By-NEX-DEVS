@@ -74,7 +74,7 @@ class UpNextQueue extends StatelessWidget {
                         context: playerController
                             .homeScaffoldkey.currentState!.context,
                         //constraints: BoxConstraints(maxHeight:Get.height),
-                        barrierColor: Colors.transparent.withAlpha(100),
+                        barrierColor: Colors.transparent.withValues(alpha: 100 / 255),
                         builder: (context) => SongInfoBottomSheet(
                           playerController.currentQueue[index],
                           calledFromQueue: true,
@@ -137,7 +137,7 @@ class UpNextQueue extends StatelessWidget {
                                       .textTheme
                                       .titleMedium!
                                       .color!
-                                      .withOpacity(0.35))
+                                      .withValues(alpha: 0.35))
                           : Theme.of(homeScaffoldContext).textTheme.titleSmall,
                     ),
                     trailing: ReorderableDragStartListener(

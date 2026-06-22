@@ -18,6 +18,17 @@ class ModificationList extends StatelessWidget {
       return Expanded(
         child: ReorderableListView.builder(
             padding: const EdgeInsets.only(right: 5, bottom: 200),
+            onReorder: (old_, new_) {
+              if (old_ < new_) {
+                new_--;
+              }
+              final list = items.toList();
+              final item = list.removeAt(
+                old_,
+              );
+              list.insert(new_, item);
+              screenController.additionalOperationTempList.value = list;
+            },
             itemBuilder: (context, index) => ListTile(
                   key: Key('$index'),
                   onTap: () {},
@@ -45,18 +56,7 @@ class ModificationList extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
-            itemCount: items.length,
-            onReorder: (old_, new_) {
-              if (old_ < new_) {
-                new_--;
-              }
-              final list = items.toList();
-              final item = list.removeAt(
-                old_,
-              );
-              list.insert(new_, item);
-              screenController.additionalOperationTempList.value = list;
-            }),
+            itemCount: items.length),
       );
     } else if (mode == OperationMode.addToPlaylist ||
         mode == OperationMode.delete) {
