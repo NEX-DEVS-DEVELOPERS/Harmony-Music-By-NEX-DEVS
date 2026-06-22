@@ -27,6 +27,7 @@ class UpNextQueue extends StatelessWidget {
           footer: SizedBox(height: Get.mediaQuery.padding.bottom),
           scrollController:
               isQueueInSlidePanel ? playerController.scrollController : null,
+          // ignore: deprecated_member_use
           onReorder: (int oldIndex, int newIndex) {
             if (playerController.isShuffleModeEnabled.isTrue) {
               ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
@@ -74,7 +75,7 @@ class UpNextQueue extends StatelessWidget {
                         context: playerController
                             .homeScaffoldkey.currentState!.context,
                         //constraints: BoxConstraints(maxHeight:Get.height),
-                        barrierColor: Colors.transparent.withValues(alpha: 100 / 255),
+                        barrierColor: Colors.transparent.withAlpha(100),
                         builder: (context) => SongInfoBottomSheet(
                           playerController.currentQueue[index],
                           calledFromQueue: true,

@@ -62,37 +62,37 @@ class AddToPlaylist extends StatelessWidget {
               ),
               if (isPipedLinked)
                 Obx(
-                  () => RadioGroup<String>(
-                    groupValue: addToPlaylistController.playlistType.value,
-                    onChanged: (String? val) {
-                      if (val != null) {
-                        addToPlaylistController.changePlaylistType(val);
-                      }
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Radio(
-                              value: "piped",
-                            ),
-                            Text("Piped".tr),
-                          ],
-                        ),
-                        const SizedBox(
-                          width: 15,
-                        ),
-                        Row(
-                          children: [
-                            const Radio(
-                              value: "local",
-                            ),
-                            Text("local".tr),
-                          ],
-                        )
-                      ],
-                    ),
+                  () => Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: "piped",
+                            // ignore: deprecated_member_use
+                            groupValue: addToPlaylistController.playlistType.value,
+                            // ignore: deprecated_member_use
+                            onChanged: (val) => addToPlaylistController.changePlaylistType(val),
+                          ),
+                          Text("Piped".tr),
+                        ],
+                      ),
+                      const SizedBox(
+                        width: 15,
+                      ),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: "local",
+                            // ignore: deprecated_member_use
+                            groupValue: addToPlaylistController.playlistType.value,
+                            // ignore: deprecated_member_use
+                            onChanged: (val) => addToPlaylistController.changePlaylistType(val),
+                          ),
+                          Text("local".tr),
+                        ],
+                      )
+                    ],
                   ),
                 ),
               Container(

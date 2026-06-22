@@ -826,27 +826,27 @@ Widget radioWidget(
     {required String label,
     required SettingsScreenController controller,
     required value}) {
-  return Obx(() => RadioGroup(
-        groupValue: value.runtimeType == ThemeType
-            ? controller.themeModetype.value
-            : controller.discoverContentType.value,
-        onChanged: value.runtimeType == ThemeType
-            ? (val) => controller.onThemeChange(val)
-            : (val) => controller.onContentChange(val),
-        child: ListTile(
-          visualDensity: const VisualDensity(vertical: -4),
-          onTap: () {
-            if (value.runtimeType == ThemeType) {
-              controller.onThemeChange(value);
-            } else {
-              controller.onContentChange(value);
-              Navigator.of(Get.context!).pop();
-            }
-          },
-          leading: Radio(
-            value: value,
-          ),
-          title: Text(label),
+  return Obx(() => ListTile(
+        visualDensity: const VisualDensity(vertical: -4),
+        onTap: () {
+          if (value.runtimeType == ThemeType) {
+            controller.onThemeChange(value);
+          } else {
+            controller.onContentChange(value);
+            Navigator.of(Get.context!).pop();
+          }
+        },
+        leading: Radio<dynamic>(
+          value: value,
+          // ignore: deprecated_member_use
+          groupValue: value.runtimeType == ThemeType
+              ? controller.themeModetype.value
+              : controller.discoverContentType.value,
+          // ignore: deprecated_member_use
+          onChanged: value.runtimeType == ThemeType
+              ? (val) => controller.onThemeChange(val)
+              : (val) => controller.onContentChange(val),
         ),
+        title: Text(label),
       ));
 }

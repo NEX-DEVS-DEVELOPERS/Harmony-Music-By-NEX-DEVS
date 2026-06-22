@@ -23,7 +23,9 @@ jobs:
           java-version: '17'
 
       - name: Install packages
-        run: flutter pub get
+        run: |
+          flutter clean
+          flutter pub get
 
       - name: Linter
         run: flutter analyze

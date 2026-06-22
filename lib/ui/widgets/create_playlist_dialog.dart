@@ -54,37 +54,37 @@ class CreateNRenamePlaylistPopup extends StatelessWidget {
               ),
               if (isPipedLinked && !renamePlaylist)
                 Obx(
-                  () => RadioGroup<String>(
-                    groupValue: librPlstCntrller.playlistCreationMode.value,
-                    onChanged: (String? val) {
-                      if (val != null) {
-                        librPlstCntrller.changeCreationMode(val);
-                      }
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Radio(
-                              value: "piped",
-                            ),
-                            Text("Piped".tr),
-                          ],
-                        ),
-                        const SizedBox(
-                          width: 15,
-                        ),
-                        Row(
-                          children: [
-                            const Radio(
-                              value: "local",
-                            ),
-                            Text("local".tr),
-                          ],
-                        )
-                      ],
-                    ),
+                  () => Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: "piped",
+                            // ignore: deprecated_member_use
+                            groupValue: librPlstCntrller.playlistCreationMode.value,
+                            // ignore: deprecated_member_use
+                            onChanged: (val) => librPlstCntrller.changeCreationMode(val!),
+                          ),
+                          Text("Piped".tr),
+                        ],
+                      ),
+                      const SizedBox(
+                        width: 15,
+                      ),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: "local",
+                            // ignore: deprecated_member_use
+                            groupValue: librPlstCntrller.playlistCreationMode.value,
+                            // ignore: deprecated_member_use
+                            onChanged: (val) => librPlstCntrller.changeCreationMode(val!),
+                          ),
+                          Text("local".tr),
+                        ],
+                      )
+                    ],
                   ),
                 ),
               ModifiedTextField(
