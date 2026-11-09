@@ -17,14 +17,34 @@ class StreamProvider {
   ///  1. YouTube directly (youtube_explode_dart)
   ///  2. public Piped servers   3. public Invidious servers
   ///  4. yt-dlp (desktop only; downloaded once on first need)
-  static Future<StreamProvider> fetch(String videoId) async {
+  static Future<StreamProvider> fetch(String videoId,
+      {void Function(String status)? onStatus}) async {
+    try {
+      return await _fetchChain(videoId, onStatus);
+    } catch (e) {
+      // never let an unexpected error escape silently
+      printERROR('Stream lookup crashed for $videoId: $e');
+      return StreamProvider(
+          playable: false, statusMSG: 'Could not get audio (unexpected error: $e)');
+    }
+  }
+
+  static Future<StreamProvider> _fetchChain(
+      String videoId, void Function(String status)? onStatus) async {
     final errors = <String>[];
+    void status(String m) => onStatus?.call(m);
 
     // 1. YouTube directly
-    final direct = await _fetchDirect(videoId);
+    status('Finding the song on YouTube...');
+    final direct = await _fetchDirect(videoId).timeout(
+        const Duration(seconds: 25),
+        onTimeout: () => StreamProvider(
+            playable: false, statusMSG: 'timed out after 25s'));
     if (direct.playable) {
-      final problem =
-          await StreamProxy.instance.validate(direct.highestQualityAudio!.url);
+      final problem = await StreamProxy.instance
+          .validate(direct.highestQualityAudio!.url)
+          .timeout(const Duration(seconds: 20),
+              onTimeout: () => 'stream check timed out');
       if (problem == null) return direct;
       errors.add('YouTube: $problem');
     } else {
@@ -32,22 +52,33 @@ class StreamProvider {
     }
 
     // 2 + 3. public frontends (run at the same time, first working one wins)
+    status('YouTube didn\'t work - switching to another source...');
     final frontend = await firstSuccess<List<Audio>>([
       FrontendSources.piped(videoId, errors),
       FrontendSources.invidious(videoId, errors),
-    ]);
+    ]).timeout(const Duration(seconds: 25), onTimeout: () {
+      errors.add('Piped/Invidious: timed out');
+      return null;
+    });
     if (frontend != null) {
       printINFO('Stream for $videoId from a Piped/Invidious server');
       return StreamProvider(
           playable: true, statusMSG: "OK", audioFormats: frontend);
     }
 
-    // 4. yt-dlp
-    final ytdlp = await YtDlpSource.resolve(videoId, errors);
-    if (ytdlp != null) {
-      printINFO('Stream for $videoId from yt-dlp');
-      return StreamProvider(
-          playable: true, statusMSG: "OK", audioFormats: ytdlp);
+    // 4. yt-dlp (desktop)
+    if (Platform.isWindows || Platform.isLinux) {
+      status('Switching to yt-dlp (first time may download ~18 MB)...');
+      final ytdlp = await YtDlpSource.resolve(videoId, errors).timeout(
+          const Duration(seconds: 150), onTimeout: () {
+        errors.add('yt-dlp: timed out');
+        return null;
+      });
+      if (ytdlp != null) {
+        printINFO('Stream for $videoId from yt-dlp');
+        return StreamProvider(
+            playable: true, statusMSG: "OK", audioFormats: ytdlp);
+      }
     }
 
     printERROR('All stream sources failed for $videoId: ${errors.join(' | ')}');
@@ -61,7 +92,8 @@ class StreamProvider {
     final detail = errors.join(' | ');
     return StreamProvider(
         playable: false,
-        statusMSG: 'Could not get audio. ${detail.length > 260 ? '${detail.substring(0, 260)}...' : detail}');
+        statusMSG:
+            'Could not get audio. ${detail.length > 300 ? '${detail.substring(0, 300)}...' : detail}');
   }
 
   static Future<StreamProvider> _fetchDirect(String videoId) async {

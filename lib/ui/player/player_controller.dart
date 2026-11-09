@@ -809,9 +809,22 @@ class PlayerController extends GetxController
   /// Called from audio handler in case audio is not playable
   /// or returned streamInfo null due to network error
   void notifyPlayError(String message) {
-    ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
-        Get.context!, message == "networkError" ? message.tr : message,
-        size: SanckBarSize.MEDIUM));
+    final ctx = Get.context;
+    if (ctx == null) return;
+    ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
+    ScaffoldMessenger.of(ctx).showSnackBar(snackbar(
+        ctx, message == "networkError" ? message.tr : message,
+        size: SanckBarSize.BIG, duration: const Duration(seconds: 10)));
+  }
+
+  /// Short status shown while a song is loading ("switching to another
+  /// source..."), so the spinner never looks stuck.
+  void showLoadingStatus(String message) {
+    final ctx = Get.context;
+    if (ctx == null) return;
+    ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
+    ScaffoldMessenger.of(ctx).showSnackBar(snackbar(ctx, message,
+        size: SanckBarSize.BIG, duration: const Duration(seconds: 6)));
   }
 
   @override

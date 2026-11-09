@@ -1,4 +1,5 @@
 import 'dart:core';
+import 'dart:isolate';
 import 'package:flutter/services.dart';
 import 'package:harmonymusic/services/stream_service.dart';
 
@@ -27,11 +28,20 @@ import 'package:harmonymusic/services/stream_service.dart';
 //   }
 // }
 
-Future<Map<String, dynamic>> getStreamInfo(String songId, dynamic token) async {
-  if (songId.substring(0, 4) == "MPED") {
-    songId = songId.substring(4);
+Future<Map<String, dynamic>> getStreamInfo(String songId, dynamic token,
+    [SendPort? statusPort]) async {
+  try {
+    if (songId.length > 4 && songId.substring(0, 4) == "MPED") {
+      songId = songId.substring(4);
+    }
+    BackgroundIsolateBinaryMessenger.ensureInitialized(token);
+    final playerResponse = await StreamProvider.fetch(songId,
+        onStatus: (m) => statusPort?.send(m));
+    return playerResponse.hmStreamingData;
+  } catch (e) {
+    return {
+      "playable": false,
+      "statusMSG": "Could not get audio (lookup failed: $e)",
+    };
   }
-  BackgroundIsolateBinaryMessenger.ensureInitialized(token);
-  final playerResponse = (await StreamProvider.fetch(songId));
-  return playerResponse.hmStreamingData;
 }

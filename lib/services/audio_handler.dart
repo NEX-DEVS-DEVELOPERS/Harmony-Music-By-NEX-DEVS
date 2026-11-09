@@ -475,7 +475,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
 
         mediaItem.add(currentSong);
-        final streamInfo = await futureStreamInfo;
+        final streamInfo = await _safeStreamInfo(futureStreamInfo);
         if (songIndex != currentIndex) {
           return;
         } else if (!streamInfo.playable) {
@@ -559,7 +559,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         await _playList.clear();
         mediaItem.add(currMed);
         queue.add([currMed]);
-        final streamInfo = (await futureStreamInfo);
+        final streamInfo = await _safeStreamInfo(futureStreamInfo);
         if (!streamInfo.playable) {
           currentSongUrl = null;
           isSongLoading = false;
@@ -808,6 +808,17 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
 // Work around used [useNewInstanceOfExplode = false] to Fix Connection closed before full header was received issue
+  /// Never lets a failed lookup leave the player stuck without a message.
+  Future<HMStreamingData> _safeStreamInfo(Future<HMStreamingData> f) async {
+    try {
+      return await f;
+    } catch (e) {
+      printERROR('Stream lookup failed: $e');
+      return HMStreamingData(
+          playable: false, statusMSG: 'Could not get audio ($e)');
+    }
+  }
+
   /// The stream lookup runs in another isolate, so tell this isolate's
   /// proxy about the headers / size the URL needs.
   void _registerForProxy(Audio? audio) {
@@ -904,8 +915,25 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       if (streamInfo == null) {
         final token = RootIsolateToken.instance;
-        final streamInfoJson =
-            await Isolate.run(() => getStreamInfo(songId, token));
+        final statusPort = ReceivePort();
+        statusPort.listen((m) {
+          try {
+            Get.find<PlayerController>().showLoadingStatus('$m');
+          } catch (_) {}
+        });
+        Map<String, dynamic> streamInfoJson;
+        try {
+          streamInfoJson = await Isolate.run(
+                  () => getStreamInfo(songId, token, statusPort.sendPort))
+              .timeout(const Duration(seconds: 220));
+        } catch (e) {
+          streamInfoJson = {
+            "playable": false,
+            "statusMSG": "Could not get audio ($e)",
+          };
+        } finally {
+          statusPort.close();
+        }
         streamInfo = HMStreamingData.fromJson(streamInfoJson);
         if (streamInfo.playable) songsUrlCacheBox.put(songId, streamInfoJson);
       }
