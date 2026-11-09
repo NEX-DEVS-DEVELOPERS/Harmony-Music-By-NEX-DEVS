@@ -29,14 +29,18 @@ import 'package:harmonymusic/services/stream_service.dart';
 // }
 
 Future<Map<String, dynamic>> getStreamInfo(String songId, dynamic token,
-    [SendPort? statusPort]) async {
+    [SendPort? statusPort,
+    bool lazyYtDlp = false,
+    bool skipYtDlp = false]) async {
   try {
     if (songId.length > 4 && songId.substring(0, 4) == "MPED") {
       songId = songId.substring(4);
     }
     BackgroundIsolateBinaryMessenger.ensureInitialized(token);
     final playerResponse = await StreamProvider.fetch(songId,
-        onStatus: (m) => statusPort?.send(m));
+        onStatus: (m) => statusPort?.send(m),
+        lazyYtDlp: lazyYtDlp,
+        skipYtDlp: skipYtDlp);
     return playerResponse.hmStreamingData;
   } catch (e) {
     return {
@@ -55,6 +59,8 @@ Future<Map<String, dynamic>> getStreamInfo(String songId, dynamic token,
 /// ReceivePort too, which cannot be sent to another isolate
 /// ("object is unsendable") and made every song lookup fail instantly.
 Future<Map<String, dynamic>> runStreamLookup(
-    String songId, dynamic token, SendPort statusPort) {
-  return Isolate.run(() => getStreamInfo(songId, token, statusPort));
+    String songId, dynamic token, SendPort statusPort,
+    {bool lazyYtDlp = false, bool skipYtDlp = false}) {
+  return Isolate.run(
+      () => getStreamInfo(songId, token, statusPort, lazyYtDlp, skipYtDlp));
 }

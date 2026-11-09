@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../utils/helper.dart';
 import 'stream_proxy.dart';
 import 'stream_service.dart';
+import 'ytdlp_stream.dart';
 
 /// One playable audio stream found by a source, before it is turned into an
 /// [Audio] used by the player.
@@ -245,6 +246,32 @@ class FrontendSources {
 /// often and copes with YouTube changes. Downloaded once from the official
 /// yt-dlp GitHub releases into the app's data folder if not already present.
 class YtDlpSource {
+  /// Marker the lookup returns for "play this through a live yt-dlp stream".
+  static const streamScheme = 'ytdlp-stream://';
+
+  /// Where to play [videoId] from: a finished local file if we already have
+  /// one, otherwise the URL of a live yt-dlp stream (ready when the first
+  /// bytes have arrived). Returns null and fills [errors] on failure.
+  static Future<String?> playableLocation(String videoId, List<String> errors,
+      {String? binary, Directory? outDir, List<String>? streamArgs}) async {
+    try {
+      final bin = binary ?? await _binary(errors);
+      if (bin == null) return null;
+      final dir = outDir ??
+          Directory('${(await getTemporaryDirectory()).path}/harmony_stream');
+      await dir.create(recursive: true);
+      final existing = _findAudioFile(dir, videoId);
+      if (existing != null && await _checkAudioFile(existing) == null) {
+        return existing.path; // played before: instant
+      }
+      return await YtDlpStreamer.instance
+          .start(videoId, bin, dir, args: streamArgs);
+    } catch (e) {
+      errors.add('yt-dlp: $e');
+      return null;
+    }
+  }
+
   static Future<String?> _binary(List<String> errors) async {
     if (!(Platform.isWindows || Platform.isLinux)) return null;
     // already on PATH?

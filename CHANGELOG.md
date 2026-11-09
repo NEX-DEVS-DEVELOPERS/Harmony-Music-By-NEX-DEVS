@@ -1,3 +1,7 @@
+# 1.12.6
+* **Live streaming (Windows/Linux)**: a song starts playing as soon as yt-dlp's first audio bytes arrive instead of after the whole file is downloaded. A copy is saved while streaming, so replays are instant and seeking works once it has finished. If yt-dlp's stream fails, the app tries the other sources; if the player can't play the live stream at all, it switches to the file method automatically.
+* **Fixed "Downloading failed due to network/stream error"** when saving a song: the downloader expected a web link but yt-dlp now provides a local file, which it tried to fetch over the network. It now copies the file (or downloads a link), and the error message shows the real reason.
+
 # 1.12.5
 * **yt-dlp now downloads the song itself** (Windows/Linux): instead of only asking yt-dlp for a link and fetching it with our own code (which YouTube kept refusing with HTTP 403), yt-dlp downloads the audio file and Harmony plays that file. Files are checked to be real, complete audio, reused for repeat plays, and only the 5 newest are kept. 
 * Download errors now say exactly what failed: which server, which client, which byte range and what the server said.

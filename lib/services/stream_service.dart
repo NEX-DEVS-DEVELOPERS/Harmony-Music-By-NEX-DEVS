@@ -17,10 +17,17 @@ class StreamProvider {
   ///  1. YouTube directly (youtube_explode_dart)
   ///  2. public Piped servers   3. public Invidious servers
   ///  4. yt-dlp (desktop only; downloaded once on first need)
+  ///
+  /// [lazyYtDlp]: for playback on desktop, don't wait for yt-dlp to download
+  /// the whole song; return a `ytdlp-stream://<id>` marker that the player
+  /// turns into a live stream. Downloads pass false and get a real file.
+  /// [skipYtDlp]: used as a fallback when the yt-dlp stream failed.
   static Future<StreamProvider> fetch(String videoId,
-      {void Function(String status)? onStatus}) async {
+      {void Function(String status)? onStatus,
+      bool lazyYtDlp = false,
+      bool skipYtDlp = false}) async {
     try {
-      return await _fetchChain(videoId, onStatus);
+      return await _fetchChain(videoId, onStatus, lazyYtDlp, skipYtDlp);
     } catch (e) {
       // never let an unexpected error escape silently
       printERROR('Stream lookup crashed for $videoId: $e');
@@ -29,8 +36,8 @@ class StreamProvider {
     }
   }
 
-  static Future<StreamProvider> _fetchChain(
-      String videoId, void Function(String status)? onStatus) async {
+  static Future<StreamProvider> _fetchChain(String videoId,
+      void Function(String status)? onStatus, bool lazyYtDlp, bool skipYtDlp) async {
     final errors = <String>[];
     void status(String m) => onStatus?.call(m);
 
@@ -38,7 +45,20 @@ class StreamProvider {
     // library's default client now gets HTTP 403 on audio; yt-dlp is updated
     // within days of such changes, so it is the most dependable source.
     final desktop = Platform.isWindows || Platform.isLinux;
-    if (desktop) {
+    if (desktop && !skipYtDlp && lazyYtDlp) {
+      // the player starts a live yt-dlp stream when it opens this marker
+      return StreamProvider(playable: true, statusMSG: "OK", audioFormats: [
+        Audio(
+            itag: 251,
+            audioCodec: Codec.opus,
+            bitrate: 0,
+            duration: 0,
+            loudnessDb: -5.0,
+            url: '${YtDlpSource.streamScheme}$videoId',
+            size: 0)
+      ]);
+    }
+    if (desktop && !skipYtDlp) {
       status('Finding the song (first time downloads a ~18 MB helper)...');
       final ytdlp = await YtDlpSource.downloadAudio(videoId, errors).timeout(
           const Duration(seconds: 200), onTimeout: () {

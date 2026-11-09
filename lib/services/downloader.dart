@@ -156,7 +156,7 @@ class Downloader extends GetxService {
     final settingsScreenController = Get.find<SettingsScreenController>();
     final downloadingFormat = settingsScreenController.downloadingFormat.string;
 
-    final playerResponse = await StreamProvider.fetch(song.id);
+    final playerResponse = await StreamProvider.fetch(song.id, lazyYtDlp: false);
     // if (!playerResponse.playable) {
     //   printINFO("Network error! Check your network connection.");
     //   ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
@@ -195,21 +195,21 @@ class Downloader extends GetxService {
         .replaceAll(invalidChar, "");
     String filePath = "$dirPath/$songTitle.$actualDownformat";
     printINFO("Downloading filePath: $filePath");
-    final totalBytes = requiredAudioStream.size;
 
-    // Download through the local chunking proxy (YouTube rejects/throttles
-    // whole-file requests).
-    final downloadUrl =
-        await StreamProxy.instance.proxify(requiredAudioStream.url);
-    _dio.download(
-        downloadUrl,
-        options: Options(headers: {"Range": 'bytes=0-$totalBytes'}),
-        filePath, onReceiveProgress: (count, total) {
-      if (total <= 0) return;
-      songDownloadingProgress.value = ((count / total) * 100).toInt();
-    }).then(
-      (value) async {
-        printINFO(value.data);
+    // yt-dlp hands back a finished local file; other sources give a web link.
+    // `lazyYtDlp: false` above guarantees a file (never a stream marker).
+    final source = requiredAudioStream.url;
+    final Future<void> saved = source.startsWith('http')
+        ? StreamProxy.instance.downloadToFile(source, filePath,
+            onProgress: (count, total) {
+            if (total <= 0) return;
+            songDownloadingProgress.value = ((count / total) * 100).toInt();
+          })
+        : File(source).copy(filePath).then((_) {
+            songDownloadingProgress.value = 100;
+          });
+    saved.then(
+      (_) async {
 
         String? year;
         try {
@@ -277,12 +277,11 @@ class Downloader extends GetxService {
     ).onError(
       (error, stackTrace) {
         ScaffoldMessenger.of(Get.context!).showSnackBar(snackbar(
-            Get.context!, "downloadError3".tr,
+            Get.context!, "${"downloadError3".tr}\n($error)",
             size: SanckBarSize.BIG,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 8),
             top: !GetPlatform.isDesktop));
-        printINFO(
-            "Downloading failed due to network/stream error! Please try again");
+        printERROR("Downloading failed: $error");
         complete.complete();
       },
     );

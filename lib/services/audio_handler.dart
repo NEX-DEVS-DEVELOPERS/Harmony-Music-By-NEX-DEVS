@@ -18,6 +18,7 @@ import '/models/album.dart';
 import '../models/playlist.dart';
 import '/services/equalizer.dart';
 import 'stream_proxy.dart';
+import 'stream_sources.dart';
 import '../utils/smart_shuffle.dart';
 import '/services/stream_service.dart';
 import '/models/hm_streaming_data.dart';
@@ -62,6 +63,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   bool loudnessNormalizationEnabled = false;
   // var networkErrorPause = false;
   bool isSongLoading = true;
+
+  /// Set when the player could not play the live yt-dlp stream: later songs
+  /// then use the (slower but proven) download-to-file method.
+  bool _streamingDisabled = false;
+  bool _playingViaStream = false;
 
   // list of shuffled queue songs ids
   List<String> shuffledQueue = [];
@@ -168,6 +174,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       if (e is PlayerException) {
         printERROR('Error code: ${e.code}');
         printERROR('Error message: ${e.message}');
+        if (_playingViaStream && !_streamingDisabled) {
+          // the player could not play the live stream: use files from now on
+          _streamingDisabled = true;
+          _playingViaStream = false;
+          printERROR('Live stream not playable by the player, using files');
+          customAction("playByIndex", {'index': currentIndex, 'newUrl': true});
+          return;
+        }
         try {
           Get.find<PlayerController>()
               .notifyPlayError('Playback error (${e.code}): ${e.message}');
@@ -284,6 +298,23 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
     final originalUrl = mediaItem.extras!['url'] as String;
+
+    // Live yt-dlp stream: starts playing as soon as the first bytes arrive.
+    if (originalUrl.startsWith(YtDlpSource.streamScheme)) {
+      final id = originalUrl.substring(YtDlpSource.streamScheme.length);
+      Get.find<PlayerController>().showLoadingStatus('Starting the stream...');
+      final errors = <String>[];
+      final location = await YtDlpSource.playableLocation(id, errors);
+      if (location == null) {
+        throw Exception(errors.isEmpty ? 'yt-dlp stream failed' : errors.join(' | '));
+      }
+      isPlayingUsingLockCachingSource = false;
+      _playingViaStream = location.startsWith('http');
+      return AudioSource.uri(
+          location.startsWith('http') ? Uri.parse(location) : Uri.file(location),
+          tag: mediaItem);
+    }
+    _playingViaStream = false;
 
     // File already downloaded by yt-dlp: just play it.
     if (!originalUrl.startsWith('http') &&
@@ -856,7 +887,29 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   Future<AudioSource?> _createAudioSourceSafe(MediaItem item) async {
     try {
       return await _createAudioSource(item);
-    } catch (e) {
+    } catch (firstError) {
+      Object e = firstError;
+      // The yt-dlp stream failed: try the other sources before giving up.
+      final url = item.extras?['url'] as String?;
+      if (url != null && url.startsWith(YtDlpSource.streamScheme)) {
+        try {
+          printERROR('yt-dlp stream failed ($e), trying other sources');
+          Get.find<PlayerController>()
+              .showLoadingStatus('That didn\'t work - trying other sources...');
+          final json = await runStreamLookup(item.id, RootIsolateToken.instance,
+              ReceivePort().sendPort,
+              skipYtDlp: true);
+          final info = HMStreamingData.fromJson(json);
+          if (info.playable) {
+            item.extras!['url'] = info.audio!.url;
+            _registerForProxy(info.audio);
+            return await _createAudioSource(item);
+          }
+          e = Exception('${info.statusMSG} (yt-dlp: $e)');
+        } catch (e2) {
+          e = Exception('$e2 (yt-dlp: $e)');
+        }
+      }
       printERROR('Could not load audio: $e');
       isSongLoading = false;
       currentSongUrl = null;
@@ -987,7 +1040,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         Map<String, dynamic> streamInfoJson;
         try {
           streamInfoJson =
-              await runStreamLookup(songId, token, statusPort.sendPort)
+              await runStreamLookup(songId, token, statusPort.sendPort,
+                      lazyYtDlp: !_streamingDisabled)
                   .timeout(const Duration(seconds: 220));
         } catch (e) {
           streamInfoJson = {
