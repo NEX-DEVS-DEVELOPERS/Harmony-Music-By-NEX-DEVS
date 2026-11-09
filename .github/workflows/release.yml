@@ -117,9 +117,8 @@ jobs:
           path: harmony_music_linux_x64.tar.gz
 
   release:
-    # Publishes a GitHub Release (direct .exe/.apk download, no zip wrapper).
-    #  * v* tag      -> release named after the tag
-    #  * other runs  -> rolling pre-release "latest-build"
+    # Publishes a GitHub Release (direct .exe/.apk download) when a v* tag is pushed.
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-android, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
@@ -135,10 +134,6 @@ jobs:
           ls -R dist
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'latest-build' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'Latest build' }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          target_commitish: ${{ github.sha }}
           files: |
             dist/windows-installer/HarmonyMusic-Setup-*.exe
             dist/HarmonyMusic-android.apk
