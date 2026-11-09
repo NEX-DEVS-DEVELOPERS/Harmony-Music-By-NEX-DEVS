@@ -17,6 +17,7 @@ import 'package:rxdart/rxdart.dart';
 import '/models/album.dart';
 import '../models/playlist.dart';
 import '/services/equalizer.dart';
+import 'constant.dart';
 import '../utils/smart_shuffle.dart';
 import '/services/stream_service.dart';
 import '/models/hm_streaming_data.dart';
@@ -287,6 +288,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       return LockCachingAudioSource(
         Uri.parse(url),
         cacheFile: File("$_cacheDir/cachedSongs/${mediaItem.id}.mp3"),
+        headers: {'User-Agent': streamUserAgent},
         tag: mediaItem,
       );
     }
@@ -295,6 +297,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     isPlayingUsingLockCachingSource = false;
     return AudioSource.uri(
       Uri.tryParse(url)!,
+      headers: url.startsWith('http') ? {'User-Agent': streamUserAgent} : null,
       tag: mediaItem,
     );
   }

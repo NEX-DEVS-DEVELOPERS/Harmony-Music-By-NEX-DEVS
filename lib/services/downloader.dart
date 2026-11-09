@@ -1,3 +1,4 @@
+import 'constant.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -198,7 +199,10 @@ class Downloader extends GetxService {
 
     _dio.download(
         requiredAudioStream.url,
-        options: Options(headers: {"Range": 'bytes=0-$totalBytes'}),
+        options: Options(headers: {
+          "Range": 'bytes=0-$totalBytes',
+          "User-Agent": streamUserAgent,
+        }),
         filePath, onReceiveProgress: (count, total) {
       if (total <= 0) return;
       songDownloadingProgress.value = ((count / total) * 100).toInt();

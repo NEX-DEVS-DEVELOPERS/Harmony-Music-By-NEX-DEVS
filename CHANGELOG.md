@@ -1,4 +1,5 @@
 # 1.12.4
+* **Playback & downloads**: upgraded `youtube_explode_dart` (2.3.7 from Jan 2025 -> 3.1.0) which can still get audio streams from YouTube; faster song start (skips the extra watch-page request); stream URLs are now fetched with the matching Android client user agent for both playback and downloads.
 * **Smart shuffle** (Spotify-style): true random order, every song plays once before any repeats, songs by the same artist are spread apart, a new cycle never starts with the song that just played, "previous" on the first shuffled song restarts it. Also used by the playlist shuffle button.
 * **Windows installer**: CI now builds a real `HarmonyMusic-Setup-<version>.exe` installer and publishes it (with the APK and Linux build) as a GitHub Release, so no zip is needed.
 

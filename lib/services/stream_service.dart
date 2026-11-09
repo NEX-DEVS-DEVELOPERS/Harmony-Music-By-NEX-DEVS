@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import '../utils/helper.dart';
+
 class StreamProvider {
   final bool playable;
   final List<Audio>? audioFormats;
@@ -10,9 +12,19 @@ class StreamProvider {
 
   static Future<StreamProvider> fetch(String videoId) async {
     final yt = YoutubeExplode();
-    
+
     try {
-      final res = await yt.videos.streamsClient.getManifest(videoId);
+      StreamManifest res;
+      try {
+        // Fast path: skip the extra watch-page request (quicker song start).
+        res = await yt.videos.streamsClient
+            .getManifest(videoId, requireWatchPage: false);
+      } on SocketException {
+        rethrow;
+      } catch (_) {
+        // Fallback: full path (watch page + all default clients).
+        res = await yt.videos.streamsClient.getManifest(videoId);
+      }
       final audio = res.audioOnly;
       return StreamProvider(
           playable: true,
@@ -23,12 +35,13 @@ class StreamProvider {
                   audioCodec:
                       e.audioCodec.contains('mp') ? Codec.mp4a : Codec.opus,
                   bitrate: e.bitrate.bitsPerSecond,
-                  duration: e.duration ?? 0,
-                  loudnessDb: e.loudnessDb,
+                  duration: 0, // not provided by youtube_explode_dart >= 3
+                  loudnessDb: -5.0, // neutral: no volume change
                   url: e.url.toString(),
                   size: e.size.totalBytes))
               .toList());
     } catch (e) {
+      printERROR("Stream fetch failed for $videoId: $e");
       if (e is SocketException) {
         return StreamProvider(
           playable: false,
@@ -37,7 +50,7 @@ class StreamProvider {
       } else if (e is VideoUnplayableException) {
         return StreamProvider(
           playable: false,
-          statusMSG: e.reason ?? "Song is unplayable",
+          statusMSG: e.message.isNotEmpty ? e.message : "Song is unplayable",
         );
       } else if (e is VideoRequiresPurchaseException) {
         return StreamProvider(
@@ -60,6 +73,8 @@ class StreamProvider {
           statusMSG: "Unknown error occurred",
         );
       }
+    } finally {
+      yt.close();
     }
   }
 
