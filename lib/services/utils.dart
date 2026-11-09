@@ -46,13 +46,10 @@ int sumTotalDuration(Map<String, dynamic> item) {
 
 String? getItemText(Map<String, dynamic> item, int index,
     {int runIndex = 0, bool noneIfAbsent = false}) {
-  dynamic column = getFlexColumnItem(item, index);
-  if (column == null) {
+  final column = getFlexColumnItem(item, index);
+  final runs = column['text']?['runs'];
+  if (runs is! List || runs.length < runIndex + 1) {
     return noneIfAbsent ? null : "";
-  }
-  List<dynamic> runs = column['text']['runs'];
-  if (noneIfAbsent && runs.length < runIndex + 1) {
-    return null;
   }
   return runs[runIndex]['text'];
 }

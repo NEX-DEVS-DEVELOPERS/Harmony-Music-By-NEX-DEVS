@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 
 import '/models/media_Item_builder.dart';
 import '/services/utils.dart';
+import '../utils/helper.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
 import '../models/playlist.dart';
@@ -390,17 +391,19 @@ List<dynamic>? parseSongArtists(Map<String, dynamic> data, int index) {
 }
 
 Map<String, dynamic> getFlexColumnItem(Map<String, dynamic> item, int index) {
-  if ((item['flexColumns']).length <= index ||
-      !item['flexColumns'][index]['musicResponsiveListItemFlexColumnRenderer']
-          .containsKey('text') ||
-      !item['flexColumns'][index]['musicResponsiveListItemFlexColumnRenderer']
-              ['text']
-          .containsKey('runs')) {
+  // YouTube Music now also returns search entries without `flexColumns`
+  // (e.g. `messageRenderer` "No results", card shelves), so be null-safe.
+  final columns = item['flexColumns'];
+  if (columns is! List || columns.length <= index) {
     return {};
   }
-
-  return item['flexColumns'][index]
-      ['musicResponsiveListItemFlexColumnRenderer'];
+  final renderer = columns[index]?['musicResponsiveListItemFlexColumnRenderer'];
+  if (renderer is! Map<String, dynamic> ||
+      renderer['text'] is! Map ||
+      (renderer['text'] as Map)['runs'] == null) {
+    return {};
+  }
+  return renderer;
 }
 
 Map<String, dynamic> parseWatchPlaylistHome(Map<dynamic, dynamic> data) {
@@ -699,15 +702,36 @@ String? getSearchResultType(
   }
 }
 
+/// Labels YouTube Music shows for result kinds this app can't open.
+/// They used to be mis-parsed as albums (and broke the "Albums" tab).
+const _unsupportedSearchLabels = {
+  'profile',
+  'podcast',
+  'episode',
+  'show',
+};
+
 List<dynamic> parseSearchResults(List<dynamic> results,
     List<String> searchResultTypes, String? resultType, String category) {
-  return results
-      .map((result) {
-        final data = result['musicResponsiveListItemRenderer'] ?? result;
-        return parseSearchResult(data, searchResultTypes, resultType, category);
-      })
-      .whereType<dynamic>()
-      .toList();
+  final parsed = <dynamic>[];
+  for (final result in results) {
+    try {
+      if (result is! Map) continue;
+      final data = result['musicResponsiveListItemRenderer'] ?? result;
+      // e.g. messageRenderer ("No results") has no flexColumns
+      if (data is! Map<String, dynamic> || data['flexColumns'] == null) {
+        continue;
+      }
+      final item =
+          parseSearchResult(data, searchResultTypes, resultType, category);
+      if (item == null || (item is Map && item.isEmpty)) continue;
+      parsed.add(item);
+    } catch (e) {
+      // One malformed/unknown entry must never break the whole search.
+      printERROR("Skipping unparsable search result: $e");
+    }
+  }
+  return parsed;
 }
 
 dynamic parseSearchResult(Map<String, dynamic> data,
@@ -717,6 +741,11 @@ dynamic parseSearchResult(Map<String, dynamic> data,
     resultType = 'playlist';
   }
   int defaultOffset = (resultType == null) ? 2 : 0;
+  if (resultType == null &&
+      _unsupportedSearchLabels
+          .contains(getItemText(data, 1)?.toLowerCase().trim())) {
+    return null;
+  }
   Map<String, dynamic> searchResult = {'category': category};
   String? videoType = nav(data,
       [...play_button, 'playNavigationEndpoint', ...navigation_video_type]);

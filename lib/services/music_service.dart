@@ -714,7 +714,7 @@ class MusicServices extends getx.GetxService {
 
         if (searchResults.containsKey(category)) {
           final x = await getContinuations(
-              res['musicShelfRenderer'],
+              res['musicShelfRenderer'] ?? shelf ?? {},
               'musicShelfContinuation',
               limit - ((searchResults[category] as List).length),
               requestFunc,
