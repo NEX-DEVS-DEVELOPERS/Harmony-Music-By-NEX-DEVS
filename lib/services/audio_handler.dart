@@ -67,6 +67,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   /// Set when the player could not play the live yt-dlp stream: later songs
   /// then use the (slower but proven) download-to-file method.
   bool _streamingDisabled = false;
+
+  /// Queue order before shuffle was turned on (restored when it is turned off).
+  List<MediaItem>? _originalQueueOrder;
   bool _playingViaStream = false;
 
   // list of shuffled queue songs ids
@@ -499,10 +502,37 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     if (shuffleMode == AudioServiceShuffleMode.none) {
       shuffleModeEnabled = false;
       shuffledQueue.clear();
+      // put the up-next list back in its original order
+      final original = _originalQueueOrder;
+      _originalQueueOrder = null;
+      if (original != null && queue.value.isNotEmpty) {
+        final restored = restoreOriginalOrder<MediaItem>(
+            queue.value, original, (e) => e.id);
+        queue.add(restored);
+        _remapCurrentIndex(restored);
+      }
     } else {
+      _originalQueueOrder = queue.value.toList();
       _shuffleCmd(currentIndex);
       shuffleModeEnabled = true;
+      // show the shuffled order in the up-next list: what you see is what plays
+      _applyShuffleOrderToQueue();
     }
+  }
+
+  void _remapCurrentIndex(List<MediaItem> ordered) {
+    final id = mediaItem.value?.id;
+    final idx = id == null ? -1 : ordered.indexWhere((e) => e.id == id);
+    currentIndex = idx == -1 ? 0 : idx;
+  }
+
+  /// Reorders the queue to follow [shuffledQueue] so the visible up-next list
+  /// matches the real play order.
+  void _applyShuffleOrderToQueue() {
+    if (queue.value.isEmpty || shuffledQueue.isEmpty) return;
+    final ordered = orderByIds<MediaItem>(queue.value, shuffledQueue, (e) => e.id);
+    queue.add(ordered);
+    _remapCurrentIndex(ordered);
   }
 
   @override
@@ -573,6 +603,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           }
         } else {
           await _player.play();
+          _prefetchNext();
         }
         break;
 
@@ -731,7 +762,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
       case 'shuffleCmd':
         final songIndex = extras!['index'];
-        _shuffleCmd(songIndex);
+        if (extras['reorder'] == true) {
+          // new list started in shuffle mode: song `songIndex` ends up first
+          _originalQueueOrder = queue.value.toList();
+          _shuffleCmd(songIndex);
+          _applyShuffleOrderToQueue();
+        } else {
+          _shuffleCmd(songIndex);
+        }
         break;
 
       case 'upadateMediaItemInAudioService':
@@ -769,7 +807,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     final items = queue.value.toList();
     if (items.isEmpty) return;
     final ids = smartShuffle<MediaItem>(items,
-            artistOf: _primaryArtist, first: items[index])
+            artistOf: _primaryArtist,
+            first: items[index.clamp(0, items.length - 1)])
         .map((e) => e.id)
         .toList();
     shuffledQueue.replaceRange(0, shuffledQueue.length, ids);
@@ -790,6 +829,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         .toList();
     shuffledQueue.replaceRange(0, shuffledQueue.length, ids);
     currentShuffleIndex = 0;
+    _applyShuffleOrderToQueue();
   }
 
   void _normalizeVolume(double currentLoudnessDb) {
@@ -867,6 +907,32 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
 // Work around used [useNewInstanceOfExplode = false] to Fix Connection closed before full header was received issue
+  /// Starts loading the NEXT song in the background while this one plays, so
+  /// skipping to it starts instantly.
+  void _prefetchNext() {
+    if (!(GetPlatform.isWindows || GetPlatform.isLinux) || _streamingDisabled) {
+      return;
+    }
+    try {
+      final items = queue.value;
+      String? nextId;
+      if (shuffleModeEnabled) {
+        if (currentShuffleIndex + 1 < shuffledQueue.length) {
+          nextId = shuffledQueue[currentShuffleIndex + 1];
+        }
+      } else if (currentIndex + 1 < items.length) {
+        nextId = items[currentIndex + 1].id;
+      }
+      if (nextId == null) return;
+      final id = nextId.length > 4 && nextId.substring(0, 4) == "MPED"
+          ? nextId.substring(4)
+          : nextId;
+      // downloaded / cached songs don't need it
+      if (Hive.box("SongDownloads").containsKey(nextId)) return;
+      YtDlpSource.playableLocation(id, <String>[]).catchError((_) => null);
+    } catch (_) {}
+  }
+
   /// Keep only the few most recent downloaded songs in the temp folder.
   void _pruneStreamTmp(Directory dir, {required String keep}) {
     try {
@@ -1027,6 +1093,22 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
           printINFO("Got cached Url ($songId)");
           streamInfo = HMStreamingData.fromJson(streamInfoJson);
         }
+      }
+
+      // Desktop: no need for a background lookup, the live yt-dlp stream is
+      // started directly (saves the isolate start-up time).
+      if (streamInfo == null &&
+          (GetPlatform.isWindows || GetPlatform.isLinux) &&
+          !_streamingDisabled) {
+        final marker = YtDlpSource.markerAudio(
+            songId.length > 4 && songId.substring(0, 4) == "MPED"
+                ? songId.substring(4)
+                : songId);
+        streamInfo = HMStreamingData(
+            playable: true,
+            statusMSG: "OK",
+            lowQualityAudio: marker,
+            highQualityAudio: marker);
       }
 
       if (streamInfo == null) {

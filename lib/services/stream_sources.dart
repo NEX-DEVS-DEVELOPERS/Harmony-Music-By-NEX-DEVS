@@ -249,6 +249,19 @@ class YtDlpSource {
   /// Marker the lookup returns for "play this through a live yt-dlp stream".
   static const streamScheme = 'ytdlp-stream://';
 
+  /// The "play via live yt-dlp stream" placeholder the player turns into a
+  /// real stream (see `playableLocation`).
+  static Audio markerAudio(String videoId) => Audio(
+      itag: 251,
+      audioCodec: Codec.opus,
+      bitrate: 0,
+      duration: 0,
+      loudnessDb: -5.0,
+      url: '$streamScheme$videoId',
+      size: 0);
+
+  static String? _binaryPath; // remembered so later songs skip the lookup
+
   /// Where to play [videoId] from: a finished local file if we already have
   /// one, otherwise the URL of a live yt-dlp stream (ready when the first
   /// bytes have arrived). Returns null and fills [errors] on failure.
@@ -274,6 +287,16 @@ class YtDlpSource {
 
   static Future<String?> _binary(List<String> errors) async {
     if (!(Platform.isWindows || Platform.isLinux)) return null;
+    final known = _binaryPath;
+    if (known != null && (known == 'yt-dlp' || File(known).existsSync())) {
+      return known;
+    }
+    final found = await _findBinary(errors);
+    _binaryPath = found;
+    return found;
+  }
+
+  static Future<String?> _findBinary(List<String> errors) async {
     // already on PATH?
     try {
       final r = await Process.run('yt-dlp', ['--version']);

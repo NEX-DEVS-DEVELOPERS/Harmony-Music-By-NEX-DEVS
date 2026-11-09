@@ -107,5 +107,80 @@ List<T> smartShuffle<T>(
     result.add(item);
     lastArtist = artistOf(item);
   }
+  _breakUpOriginalNeighbours(result, items.toList(), artistOf);
   return result;
+}
+
+/// Makes the order more "scrambled": songs that were next to each other in the
+/// original list (e.g. consecutive album tracks) are moved apart, without
+/// putting two songs by the same artist together. Swaps only when it makes
+/// things better; position 0 (the pinned / first song) is never touched.
+void _breakUpOriginalNeighbours<T>(
+    List<T> result, List<T> original, String Function(T) artistOf) {
+  final n = result.length;
+  if (n < 4) return;
+  final pos = <T, int>{};
+  for (var i = 0; i < original.length; i++) {
+    pos[original[i]] = i;
+  }
+  bool bad(T a, T b) =>
+      artistOf(a) == artistOf(b) || ((pos[a]! - pos[b]!).abs() == 1);
+
+  // number of "bad" neighbour pairs among the adjacencies touching [slots]
+  int cost(Set<int> slots) {
+    final pairs = <int>{};
+    for (final k in slots) {
+      if (k >= 1 && k < n) pairs.add(k); // pair (k-1, k)
+      if (k + 1 >= 1 && k + 1 < n) pairs.add(k + 1); // pair (k, k+1)
+    }
+    var c = 0;
+    for (final k in pairs) {
+      if (bad(result[k - 1], result[k])) c++;
+    }
+    return c;
+  }
+
+  for (var pass = 0; pass < 6; pass++) {
+    var changed = false;
+    for (var i = 1; i < n; i++) {
+      if (!bad(result[i - 1], result[i])) continue;
+      for (var j = 1; j < n; j++) {
+        if (j == i) continue;
+        final slots = {i, j};
+        final before = cost(slots);
+        final tmp = result[i];
+        result[i] = result[j];
+        result[j] = tmp;
+        if (cost(slots) < before) {
+          changed = true;
+          break; // keep the improving swap
+        }
+        result[j] = result[i]; // undo
+        result[i] = tmp;
+      }
+    }
+    if (!changed) break;
+  }
+}
+
+/// Reorders [items] to follow [ids]; items whose id is not listed are appended.
+List<T> orderByIds<T>(Iterable<T> items, List<String> ids, String Function(T) idOf) {
+  final byId = {for (final e in items) idOf(e): e};
+  final out = <T>[
+    for (final id in ids)
+      if (byId.containsKey(id)) byId.remove(id)!,
+  ];
+  out.addAll(byId.values);
+  return out;
+}
+
+/// Puts [current] back into the [original] order (turning shuffle off): items
+/// that were added meanwhile go to the end, removed ones are dropped.
+List<T> restoreOriginalOrder<T>(
+    List<T> current, List<T> original, String Function(T) idOf) {
+  final ids = {for (final e in current) idOf(e)};
+  final restored = original.where((e) => ids.contains(idOf(e))).toList();
+  final known = {for (final e in restored) idOf(e)};
+  restored.addAll(current.where((e) => !known.contains(idOf(e))));
+  return restored;
 }

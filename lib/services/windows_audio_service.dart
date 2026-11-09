@@ -11,6 +11,8 @@ class WindowsAudioService extends GetxService {
   final playerController = Get.find<PlayerController>();
 
   static const _mediaKeys = MethodChannel('harmony/media_keys');
+  String _lastKey = '';
+  DateTime _lastKeyAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void onInit() {
@@ -24,7 +26,22 @@ class WindowsAudioService extends GetxService {
   void _initMediaKeys() {
     _mediaKeys.setMethodCallHandler((call) async {
       if (call.method != 'onKey') return;
+      // the same press can be reported twice (key + app command): ignore the
+      // repeat within a short moment
+      final now = DateTime.now();
+      if (call.arguments == _lastKey &&
+          now.difference(_lastKeyAt).inMilliseconds < 350) {
+        return;
+      }
+      _lastKey = '${call.arguments}';
+      _lastKeyAt = now;
       switch (call.arguments) {
+        case 'play':
+          playerController.play();
+          break;
+        case 'pause':
+          playerController.pause();
+          break;
         case 'playPause':
           playerController.playPause();
           break;

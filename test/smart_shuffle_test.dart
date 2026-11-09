@@ -57,4 +57,37 @@ void main() {
     final same = [for (var i = 0; i < 5; i++) _S('s$i', 'same')];
     expect(smartShuffle(same, artistOf: artistOf).length, 5);
   });
+
+  test('scrambled: songs that were neighbours stay apart', () {
+    for (var seed = 0; seed < 200; seed++) {
+      final out = smartShuffle(songs, artistOf: artistOf, random: Random(seed));
+      for (var i = 1; i < out.length; i++) {
+        final a = songs.indexOf(out[i - 1]), b = songs.indexOf(out[i]);
+        expect((a - b).abs(), isNot(1), reason: 'seed $seed idx $i');
+      }
+    }
+  });
+
+  test('scrambling keeps the full permutation and the pinned first song', () {
+    final out = smartShuffle(songs,
+        artistOf: artistOf, first: songs[5], random: Random(3));
+    expect(out.first, songs[5]);
+    expect(out.toSet().length, songs.length);
+  });
+
+  test('orderByIds / restoreOriginalOrder', () {
+    final shuffled = smartShuffle(songs, artistOf: artistOf, random: Random(9));
+    final ids = shuffled.map((e) => e.id).toList();
+    final reordered = orderByIds(songs, ids, (e) => e.id);
+    expect(reordered.map((e) => e.id).toList(), ids);
+
+    // new song added while shuffled, one removed
+    final extra = _S('new', 'x');
+    final current = [...shuffled.where((e) => e.id != 's3'), extra];
+    final restored = restoreOriginalOrder(current, songs, (e) => e.id);
+    expect(restored.last, extra);
+    expect(restored.where((e) => e.id == 's3'), isEmpty);
+    final origIds = songs.map((e) => e.id).where((i) => i != 's3').toList();
+    expect(restored.take(origIds.length).map((e) => e.id).toList(), origIds);
+  });
 }

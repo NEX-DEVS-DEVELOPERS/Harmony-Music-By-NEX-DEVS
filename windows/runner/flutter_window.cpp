@@ -100,7 +100,34 @@ bool FlutterWindow::OnCreate() {
         }
       });
 
+  // Catch media commands that arrive as WM_APPCOMMAND (not as key presses):
+  // register to see them system-wide through the shell hook.
+  shell_hook_message_ = ::RegisterWindowMessageW(L"SHELLHOOK");
+  ::RegisterShellHookWindow(GetHandle());
+
   return true;
+}
+
+namespace {
+// Maps a WM_APPCOMMAND media command to the name sent to Dart (or nullptr).
+const char* MediaKeyForAppCommand(int cmd) {
+  switch (cmd) {
+    case APPCOMMAND_MEDIA_PLAY_PAUSE: return "playPause";
+    case APPCOMMAND_MEDIA_PLAY: return "play";
+    case APPCOMMAND_MEDIA_PAUSE: return "pause";
+    case APPCOMMAND_MEDIA_NEXTTRACK: return "next";
+    case APPCOMMAND_MEDIA_PREVIOUSTRACK: return "previous";
+    case APPCOMMAND_MEDIA_STOP: return "stop";
+    default: return nullptr;
+  }
+}
+}  // namespace
+
+void FlutterWindow::ForwardMediaKey(const char* key) {
+  if (media_keys_channel_ && key) {
+    media_keys_channel_->InvokeMethod(
+        "onKey", std::make_unique<flutter::EncodableValue>(std::string(key)));
+  }
 }
 
 namespace {
@@ -138,6 +165,7 @@ void FlutterWindow::UnregisterMediaKeys() {
 }
 
 void FlutterWindow::OnDestroy() {
+  if (GetHandle()) ::DeregisterShellHookWindow(GetHandle());
   UnregisterMediaKeys();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -150,6 +178,24 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // Headset button delivered as an app command to ANY window (shell hook)
+  if (shell_hook_message_ != 0 && message == shell_hook_message_ &&
+      wparam == HSHELL_APPCOMMAND && media_keys_registered_) {
+    const char* key = MediaKeyForAppCommand(GET_APPCOMMAND_LPARAM(lparam));
+    if (key) {
+      ForwardMediaKey(key);
+      return 0;
+    }
+  }
+  // ...or delivered directly to this window while it is in front
+  if (message == WM_APPCOMMAND && media_keys_registered_) {
+    const char* key = MediaKeyForAppCommand(GET_APPCOMMAND_LPARAM(lparam));
+    if (key) {
+      ForwardMediaKey(key);
+      return TRUE;
+    }
+  }
+
   if (message == WM_HOTKEY && media_keys_channel_) {
     const char* key = nullptr;
     switch (static_cast<int>(wparam)) {

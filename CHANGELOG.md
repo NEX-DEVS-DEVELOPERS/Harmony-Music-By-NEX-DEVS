@@ -1,3 +1,9 @@
+# 1.12.7
+* **Faster song start (Windows/Linux)**: the live stream is started directly (no background lookup), yt-dlp's location is remembered, and the NEXT song is loaded in the background while the current one plays, so skipping is instant.
+* **Smart shuffle, more scrambled**: new smart-shuffle icon (shuffle + sparkle) with a "Smart shuffle" label on the play bars; songs that were next to each other in the original list (e.g. album tracks) are kept apart, as is the same artist. The up-next list now shows the shuffled order (what you see is what plays) and returns to the original order when shuffle is turned off.
+* **Headset buttons**: besides media keys, Harmony now also catches buttons that Windows delivers as "app commands" (some 3.5mm jack drivers do this), system-wide, with duplicate-press filtering.
+* **Listen & identify**: records 12s at 44.1 kHz, repairs the WAV header, and explains that slowed/sped-up/remix versions usually can't be recognised.
+
 # 1.12.6
 * **Live streaming (Windows/Linux)**: a song starts playing as soon as yt-dlp's first audio bytes arrive instead of after the whole file is downloaded. A copy is saved while streaming, so replays are instant and seeking works once it has finished. If yt-dlp's stream fails, the app tries the other sources; if the player can't play the live stream at all, it switches to the file method automatically.
 * **Fixed "Downloading failed due to network/stream error"** when saving a song: the downloader expected a web link but yt-dlp now provides a local file, which it tried to fetch over the network. It now copies the file (or downloads a link), and the error message shows the real reason.

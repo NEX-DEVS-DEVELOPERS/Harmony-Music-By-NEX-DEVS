@@ -1,3 +1,4 @@
+import '../../widgets/smart_shuffle_button.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -184,25 +185,7 @@ class MiniPlayer extends StatelessWidget {
                                                   .titleMedium!
                                                   .color,
                                             ))),
-                                    IconButton(
-                                        iconSize: 20,
-                                        onPressed:
-                                            playerController.toggleShuffleMode,
-                                        icon: Obx(() => Icon(
-                                              Icons.shuffle,
-                                              color: playerController
-                                                      .isShuffleModeEnabled
-                                                      .value
-                                                  ? Theme.of(context)
-                                                      .textTheme
-                                                      .titleLarge!
-                                                      .color
-                                                  : Theme.of(context)
-                                                      .textTheme
-                                                      .titleLarge!
-                                                      .color!
-                                                      .withValues(alpha: 0.2),
-                                            ))),
+                                    SmartShuffleButton(controller: playerController, iconSize: 20, showLabel: true),
                                   ],
                                 ),
                               if (isWideScreen && !bottomNavEnabled)

@@ -1,3 +1,4 @@
+import '../../widgets/smart_shuffle_button.dart';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -114,18 +115,7 @@ class PlayerControlWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              IconButton(
-                  onPressed: playerController.toggleShuffleMode,
-                  icon: Obx(() => Icon(
-                        Icons.shuffle,
-                        color: playerController.isShuffleModeEnabled.value
-                            ? Theme.of(context).textTheme.titleLarge!.color
-                            : Theme.of(context)
-                                .textTheme
-                                .titleLarge!
-                                .color!
-                                .withValues(alpha: 0.2),
-                      ))),
+              SmartShuffleButton(controller: playerController, iconSize: 24, showLabel: true),
               _previousButton(playerController, context),
               const CircleAvatar(radius: 35, child: AnimatedPlayButton(key: Key("playButton"),)),
               _nextButton(playerController, context),

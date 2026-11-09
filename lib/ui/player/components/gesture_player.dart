@@ -1,3 +1,4 @@
+import '../../widgets/smart_shuffle_button.dart';
 import 'dart:ui';
 
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
@@ -198,30 +199,7 @@ class GesturePlayer extends StatelessWidget {
                                                 .withValues(alpha: 0.2),
                                           ));
                                     }),
-                                    IconButton(
-                                      iconSize: 18,
-                                      splashRadius: 10,
-                                      visualDensity: const VisualDensity(
-                                          horizontal: -4, vertical: -4),
-                                      onPressed:
-                                          playerController.toggleShuffleMode,
-                                      icon: Obx(
-                                        () => Icon(
-                                          Icons.shuffle,
-                                          color: playerController
-                                                  .isShuffleModeEnabled.value
-                                              ? Theme.of(context)
-                                                  .textTheme
-                                                  .titleLarge!
-                                                  .color
-                                              : Theme.of(context)
-                                                  .textTheme
-                                                  .titleLarge!
-                                                  .color!
-                                                  .withValues(alpha: 0.2),
-                                        ),
-                                      ),
-                                    ),
+                                    SmartShuffleButton(controller: playerController, iconSize: 18, showLabel: false),
                                   ],
                                 )
                               ],

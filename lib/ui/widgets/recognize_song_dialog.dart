@@ -158,10 +158,14 @@ class _RecognizeSongDialogState extends State<RecognizeSongDialog> {
           Text('Could not recognise that song.', style: style.titleMedium),
           const SizedBox(height: 8),
           Text(
-              'The microphone heard sound (${_service.lastMaxLevelDb.toStringAsFixed(0)} dB), '
-              'but the song was not matched. Play it louder / closer to the '
-              'microphone, avoid talking over it, and try again.',
+              'The microphone heard sound, but the song was not matched.\n'
+              '- Slowed, sped-up, remix and live versions usually can\'t be recognised: try the original studio song.\n'
+              '- Play it louder / closer to the microphone and avoid talking over it.',
               style: style.bodySmall,
+              textAlign: TextAlign.center),
+          const SizedBox(height: 6),
+          Text(_service.lastDiagnostic,
+              style: style.bodySmall?.copyWith(fontSize: 10, color: Colors.grey),
               textAlign: TextAlign.center),
           const SizedBox(height: 14),
           ElevatedButton(onPressed: _listen, child: const Text('Try again')),

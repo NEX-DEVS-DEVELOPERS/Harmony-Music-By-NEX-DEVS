@@ -35,6 +35,10 @@ class FlutterWindow : public Win32Window {
   // Harmony only, so another app (e.g. a browser) doesn't steal them.
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> media_keys_channel_;
   bool media_keys_registered_ = false;
+  // Headset buttons that Windows delivers as "app commands" instead of keys
+  // (some 3.5mm jack drivers do this).
+  UINT shell_hook_message_ = 0;
+  void ForwardMediaKey(const char* key);
   bool RegisterMediaKeys();
   void UnregisterMediaKeys();
 };

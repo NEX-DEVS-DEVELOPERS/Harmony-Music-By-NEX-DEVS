@@ -400,7 +400,11 @@ class PlayerController extends GetxController
     _playerPanelCheck();
     await _audioHandler.updateQueue(mediaItems);
     if (isShuffleModeEnabled.value) {
-      await _audioHandler.customAction("shuffleCmd", {"index": index});
+      // shuffled order is shown in the queue, the chosen song is first
+      await _audioHandler
+          .customAction("shuffleCmd", {"index": index, "reorder": true});
+      await _audioHandler.customAction("playByIndex", {"index": 0});
+      return;
     }
     await _audioHandler.customAction("playByIndex", {"index": index});
   }

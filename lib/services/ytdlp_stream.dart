@@ -163,9 +163,10 @@ class YtDlpStreamer {
       _jobs[videoId] = job;
       await job.start();
       // keep memory bounded: only the 3 newest songs stay in memory
-      while (_jobs.length > 3) {
-        final oldest = _jobs.keys.first;
-        _jobs.remove(oldest)?.kill();
+      while (_jobs.length > 4) {
+        final finished = _jobs.entries.where((e) => e.value.done).toList();
+        if (finished.isEmpty) break; // never cut a song that is still loading
+        _jobs.remove(finished.first.key);
       }
     }
     await job.firstBytes;

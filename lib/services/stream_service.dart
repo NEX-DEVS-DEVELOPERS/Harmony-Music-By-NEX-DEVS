@@ -47,16 +47,10 @@ class StreamProvider {
     final desktop = Platform.isWindows || Platform.isLinux;
     if (desktop && !skipYtDlp && lazyYtDlp) {
       // the player starts a live yt-dlp stream when it opens this marker
-      return StreamProvider(playable: true, statusMSG: "OK", audioFormats: [
-        Audio(
-            itag: 251,
-            audioCodec: Codec.opus,
-            bitrate: 0,
-            duration: 0,
-            loudnessDb: -5.0,
-            url: '${YtDlpSource.streamScheme}$videoId',
-            size: 0)
-      ]);
+      return StreamProvider(
+          playable: true,
+          statusMSG: "OK",
+          audioFormats: [YtDlpSource.markerAudio(videoId)]);
     }
     if (desktop && !skipYtDlp) {
       status('Finding the song (first time downloads a ~18 MB helper)...');
