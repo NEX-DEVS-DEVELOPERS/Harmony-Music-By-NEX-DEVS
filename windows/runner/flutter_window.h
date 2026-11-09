@@ -30,6 +30,13 @@ class FlutterWindow : public Win32Window {
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> method_channel_;
+
+  // Global media keys (headset buttons / keyboard media keys) captured for
+  // Harmony only, so another app (e.g. a browser) doesn't steal them.
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> media_keys_channel_;
+  bool media_keys_registered_ = false;
+  bool RegisterMediaKeys();
+  void UnregisterMediaKeys();
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

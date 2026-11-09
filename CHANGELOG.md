@@ -1,3 +1,13 @@
+# 1.12.4
+* **Reliable playback**: audio is now played/downloaded through a small built-in local proxy that fetches YouTube streams in chunks like youtube_explode_dart does (YouTube rejects whole-file requests, which left songs stuck at 0:00). Playback errors are now shown on screen instead of failing silently.
+* Listen & identify (mic) button is now on the desktop search bar too.
+* **Headset / media keys (Windows)**: play/pause, next (double tap) and previous buttons on a headset or keyboard now control Harmony only; Harmony claims the keys with Windows so a browser tab playing video can't take them. Can be turned off in Settings -> "Headset & media keys".
+* **Windows installer upgrades in place**: uses the same install ID and folder as the original Harmony installer, so running it replaces the old version and keeps your library, playlists and settings (stored in %APPDATA%).
+* **Listen & identify (Shazam-style)**: tap the mic in the search box, let the app listen for ~8 seconds, and it identifies the song (AudD), searches it and plays it from the part you were listening to. Needs a free AudD API token, entered once in the dialog and stored only on the device.
+* **Playback & downloads**: upgraded `youtube_explode_dart` (2.3.7 from Jan 2025 -> 3.1.0) which can still get audio streams from YouTube; faster song start (skips the extra watch-page request); stream URLs are now fetched with the matching Android client user agent for both playback and downloads.
+* **Smart shuffle** (Spotify-style): true random order, every song plays once before any repeats, songs by the same artist are spread apart, a new cycle never starts with the song that just played, "previous" on the first shuffled song restarts it. Also used by the playlist shuffle button.
+* **Windows installer**: CI now builds a real `HarmonyMusic-Setup-<version>.exe` installer and publishes it (with the APK and Linux build) as a GitHub Release, so no zip is needed.
+
 # 1.12.3
 * **Fixed search** - searching for new music no longer loads forever. Root causes found by reproducing against the live YouTube Music API:
   * The search parser crashed on result entries that have no `flexColumns` (e.g. the "No results" message and card shelves), and the exception left the loading spinner running forever. Parsing is now null-safe and skips malformed entries; the search screen always finishes (shows "no match" on failure).

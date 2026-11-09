@@ -5,6 +5,7 @@ import 'components/search_item.dart';
 import '/ui/screens/Settings/settings_screen_controller.dart';
 import '../../widgets/modified_text_field.dart';
 import '/ui/navigator.dart';
+import '../../widgets/recognize_song_dialog.dart';
 import 'search_screen_controller.dart';
 
 class SearchScreen extends StatelessWidget {
@@ -87,11 +88,25 @@ class SearchScreen extends StatelessWidget {
                           contentPadding: const EdgeInsets.only(left: 5),
                           focusColor: Colors.white,
                           hintText: "searchDes".tr,
-                          suffix: IconButton(
-                            onPressed: searchScreenController.reset,
-                            icon: const Icon(Icons.close),
-                            splashRadius: 16,
-                            iconSize: 19,
+                          suffix: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Listen & identify a song',
+                                onPressed: () => showDialog(
+                                    context: context,
+                                    builder: (_) => const RecognizeSongDialog()),
+                                icon: const Icon(Icons.mic),
+                                splashRadius: 16,
+                                iconSize: 20,
+                              ),
+                              IconButton(
+                                onPressed: searchScreenController.reset,
+                                icon: const Icon(Icons.close),
+                                splashRadius: 16,
+                                iconSize: 19,
+                              ),
+                            ],
                           )),
                     ),
                     Expanded(

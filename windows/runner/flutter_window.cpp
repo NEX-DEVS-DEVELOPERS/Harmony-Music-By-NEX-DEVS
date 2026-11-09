@@ -82,10 +82,63 @@ bool FlutterWindow::OnCreate() {
 
   method_channel_ = std::move(channel);
 
+  // platform channel for capturing media keys (play/pause/next/previous)
+  media_keys_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      messenger,
+      "harmony/media_keys",
+      &flutter::StandardMethodCodec::GetInstance());
+  media_keys_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name() == "enable") {
+          result->Success(flutter::EncodableValue(this->RegisterMediaKeys()));
+        } else if (call.method_name() == "disable") {
+          this->UnregisterMediaKeys();
+          result->Success(flutter::EncodableValue(true));
+        } else {
+          result->NotImplemented();
+        }
+      });
+
   return true;
 }
 
+namespace {
+constexpr int kHotkeyPlayPause = 0x4801;
+constexpr int kHotkeyNext = 0x4802;
+constexpr int kHotkeyPrevious = 0x4803;
+constexpr int kHotkeyStop = 0x4804;
+}  // namespace
+
+// Returns true if all media keys are now owned by Harmony.
+bool FlutterWindow::RegisterMediaKeys() {
+  if (media_keys_registered_) return true;
+  HWND hwnd = GetHandle();
+  if (!hwnd) return false;
+  const UINT mods = MOD_NOREPEAT;
+  bool ok = true;
+  ok &= ::RegisterHotKey(hwnd, kHotkeyPlayPause, mods, VK_MEDIA_PLAY_PAUSE) != 0;
+  ok &= ::RegisterHotKey(hwnd, kHotkeyNext, mods, VK_MEDIA_NEXT_TRACK) != 0;
+  ok &= ::RegisterHotKey(hwnd, kHotkeyPrevious, mods, VK_MEDIA_PREV_TRACK) != 0;
+  ok &= ::RegisterHotKey(hwnd, kHotkeyStop, mods, VK_MEDIA_STOP) != 0;
+  media_keys_registered_ = true;  // so Unregister cleans up partial success
+  return ok;
+}
+
+void FlutterWindow::UnregisterMediaKeys() {
+  if (!media_keys_registered_) return;
+  HWND hwnd = GetHandle();
+  if (hwnd) {
+    ::UnregisterHotKey(hwnd, kHotkeyPlayPause);
+    ::UnregisterHotKey(hwnd, kHotkeyNext);
+    ::UnregisterHotKey(hwnd, kHotkeyPrevious);
+    ::UnregisterHotKey(hwnd, kHotkeyStop);
+  }
+  media_keys_registered_ = false;
+}
+
 void FlutterWindow::OnDestroy() {
+  UnregisterMediaKeys();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -97,6 +150,21 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_HOTKEY && media_keys_channel_) {
+    const char* key = nullptr;
+    switch (static_cast<int>(wparam)) {
+      case kHotkeyPlayPause: key = "playPause"; break;
+      case kHotkeyNext: key = "next"; break;
+      case kHotkeyPrevious: key = "previous"; break;
+      case kHotkeyStop: key = "stop"; break;
+    }
+    if (key) {
+      media_keys_channel_->InvokeMethod(
+          "onKey", std::make_unique<flutter::EncodableValue>(std::string(key)));
+      return 0;
+    }
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

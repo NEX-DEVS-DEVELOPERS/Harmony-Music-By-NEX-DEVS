@@ -5,6 +5,7 @@ import 'search_item.dart';
 import '/ui/screens/Search/search_screen_controller.dart';
 
 import '../../../navigator.dart';
+import '../../../widgets/recognize_song_dialog.dart';
 
 class DesktopSearchBar extends StatelessWidget {
   const DesktopSearchBar({super.key});
@@ -50,6 +51,12 @@ class DesktopSearchBar extends StatelessWidget {
                         ? Icons.arrow_back
                         : Icons.search))),
             trailing: [
+              IconButton(
+                  tooltip: 'Listen & identify a song',
+                  onPressed: () => showDialog(
+                      context: context,
+                      builder: (_) => const RecognizeSongDialog()),
+                  icon: const Icon(Icons.mic)),
               Obx(() => searchScreenController.isSearchBarInFocus.isTrue
                   ? IconButton(
                       onPressed: searchScreenController.reset,

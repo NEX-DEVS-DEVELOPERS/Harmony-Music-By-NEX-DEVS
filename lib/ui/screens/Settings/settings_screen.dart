@@ -432,6 +432,19 @@ class SettingsScreen extends StatelessWidget {
                             onChanged: settingsController
                                 .toggleRestorePlaybackSession),
                       )),
+                  if (GetPlatform.isWindows)
+                    ListTile(
+                        contentPadding:
+                            const EdgeInsets.only(left: 5, right: 10),
+                        title: const Text("Headset & media keys"),
+                        subtitle: Text(
+                            "Play/pause, next and previous buttons on your headset or keyboard control Harmony only (other apps like the browser won't take them).",
+                            style: Theme.of(context).textTheme.bodyMedium),
+                        trailing: Obx(
+                          () => CustSwitch(
+                              value: settingsController.captureMediaKeys.value,
+                              onChanged: settingsController.toggleCaptureMediaKeys),
+                        )),
                   ListTile(
                     contentPadding: const EdgeInsets.only(left: 5, right: 10),
                     title: Text("autoOpenPlayer".tr),

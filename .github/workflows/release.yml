@@ -36,7 +36,10 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
 
   build-windows:
-    runs-on: windows-latest
+    # windows-2022 (VS 2022 + older CMake): windows-latest now ships VS 2026 whose
+    # CMake refuses to extract the audiotags/smtc_windows prebuilt libs through
+    # plugin symlinks, which breaks the install step.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
@@ -53,15 +56,29 @@ jobs:
           flutter pub get
           flutter build windows --release
 
-      - name: Package Windows (Zip)
+      - name: Read app version
+        id: ver
+        shell: pwsh
         run: |
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows\harmony_music_windows.zip
+          $v = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9.]+)').Matches[0].Groups[1].Value
+          "version=$v" >> $env:GITHUB_OUTPUT
 
-      - name: Upload Windows zip
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build Windows installer (.exe)
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=${{ steps.ver.outputs.version }}" windows\packaging\installer.iss
+          Get-ChildItem dist
+
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: build\windows\harmony_music_windows.zip
+          name: windows-installer
+          path: dist\HarmonyMusic-Setup-*.exe
 
   build-linux:
     runs-on: ubuntu-latest
@@ -100,7 +117,7 @@ jobs:
           path: harmony_music_linux_x64.tar.gz
 
   release:
-    # Publishes a GitHub Release with all three builds when a v* tag is pushed.
+    # Publishes a GitHub Release (direct .exe/.apk download) when a v* tag is pushed.
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-android, build-windows, build-linux]
     runs-on: ubuntu-latest
@@ -110,9 +127,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+      - name: Rename files
+        run: |
+          mv dist/android-apk/app-release.apk dist/HarmonyMusic-android.apk
+          mv dist/linux-release/harmony_music_linux_x64.tar.gz dist/HarmonyMusic-linux-x64.tar.gz
+          ls -R dist
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/android-apk/app-release.apk
-            dist/windows-release/harmony_music_windows.zip
-            dist/linux-release/harmony_music_linux_x64.tar.gz
+            dist/windows-installer/HarmonyMusic-Setup-*.exe
+            dist/HarmonyMusic-android.apk
+            dist/HarmonyMusic-linux-x64.tar.gz

@@ -17,6 +17,8 @@ import 'package:rxdart/rxdart.dart';
 import '/models/album.dart';
 import '../models/playlist.dart';
 import '/services/equalizer.dart';
+import 'stream_proxy.dart';
+import '../utils/smart_shuffle.dart';
 import '/services/stream_service.dart';
 import '/models/hm_streaming_data.dart';
 import '/ui/player/player_controller.dart';
@@ -166,6 +168,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       if (e is PlayerException) {
         printERROR('Error code: ${e.code}');
         printERROR('Error message: ${e.message}');
+        try {
+          Get.find<PlayerController>()
+              .notifyPlayError('Playback error (${e.code}): ${e.message}');
+        } catch (_) {}
       } else {
         printERROR('An error occurred: $e');
         Duration curPos = _player.position;
@@ -276,11 +282,13 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     queue.add(newQueue);
   }
 
-  AudioSource _createAudioSource(MediaItem mediaItem) {
-    final url = mediaItem.extras!['url'] as String;
-    if (url.contains('/cache') ||
+  Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
+    final originalUrl = mediaItem.extras!['url'] as String;
+    // Play YouTube streams through the local chunking proxy (see StreamProxy).
+    final url = await StreamProxy.instance.proxify(originalUrl);
+    if (originalUrl.contains('/cache') ||
         (Get.find<SettingsScreenController>().cacheSongs.isTrue &&
-            url.contains("http"))) {
+            originalUrl.contains("http"))) {
       printINFO("Playing Using LockCaching");
       isPlayingUsingLockCachingSource = true;
       return LockCachingAudioSource(
@@ -359,8 +367,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   int _getNextSongIndex() {
     if (shuffleModeEnabled) {
       if (currentShuffleIndex + 1 >= shuffledQueue.length) {
-        shuffledQueue.shuffle();
-        currentShuffleIndex = 0;
+        // Everything has played once: start a fresh smart-shuffled cycle that
+        // doesn't begin with the song that just finished.
+        _reshuffleCycle(avoidFirstId: shuffledQueue.isNotEmpty ? shuffledQueue.last : null);
       } else {
         currentShuffleIndex += 1;
       }
@@ -380,8 +389,8 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   int _getPrevSongIndex() {
     if (shuffleModeEnabled) {
       if (currentShuffleIndex - 1 < 0) {
-        shuffledQueue.shuffle();
-        currentShuffleIndex = shuffledQueue.length - 1;
+        // Nothing before the first shuffled song: stay on it (it restarts).
+        return currentIndex;
       } else {
         currentShuffleIndex -= 1;
       }
@@ -482,7 +491,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currentSongUrl = currentSong.extras!['url'] = streamInfo.audio!.url;
         playbackState
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
-        await _playList.add(_createAudioSource(currentSong));
+        await _playList.add(await _createAudioSource(currentSong));
 
         isSongLoading = false;
         if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
@@ -560,7 +569,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
         currentSongUrl = currMed.extras!['url'] = streamInfo.audio!.url;
 
-        await _playList.add(_createAudioSource(currMed));
+        await _playList.add(await _createAudioSource(currMed));
         isSongLoading = false;
 
         // Normalize audio
@@ -608,9 +617,11 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       case 'shuffleQueue':
         final currentQueue = queue.value;
         final currentItem = currentQueue[currentIndex];
-        currentQueue.remove(currentItem);
-        currentQueue.shuffle();
-        currentQueue.insert(0, currentItem);
+        final smart = smartShuffle<MediaItem>(currentQueue,
+            artistOf: _primaryArtist, first: currentItem);
+        currentQueue
+          ..clear()
+          ..addAll(smart);
         queue.add(currentQueue);
         mediaItem.add(currentItem);
         currentIndex = 0;
@@ -689,12 +700,34 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     }
   }
 
+  static String _primaryArtist(MediaItem item) =>
+      (item.artist ?? '').split(',').first.trim().toLowerCase();
+
+  /// Smart (Spotify-style) shuffle of the whole queue with [index] first.
   void _shuffleCmd(int index) {
-    final queueIds = queue.value.toList().map((item) => item.id).toList();
-    final currentSongId = queueIds.removeAt(index);
-    queueIds.shuffle();
-    queueIds.insert(0, currentSongId);
-    shuffledQueue.replaceRange(0, shuffledQueue.length, queueIds);
+    final items = queue.value.toList();
+    if (items.isEmpty) return;
+    final ids = smartShuffle<MediaItem>(items,
+            artistOf: _primaryArtist, first: items[index])
+        .map((e) => e.id)
+        .toList();
+    shuffledQueue.replaceRange(0, shuffledQueue.length, ids);
+    currentShuffleIndex = 0;
+  }
+
+  /// New shuffle cycle after the previous one finished.
+  void _reshuffleCycle({String? avoidFirstId}) {
+    final items = queue.value.toList();
+    if (items.isEmpty) return;
+    final avoid = avoidFirstId == null
+        ? null
+        : items.cast<MediaItem?>().firstWhere((e) => e!.id == avoidFirstId,
+            orElse: () => null);
+    final ids = smartShuffle<MediaItem>(items,
+            artistOf: _primaryArtist, avoidFirst: avoid)
+        .map((e) => e.id)
+        .toList();
+    shuffledQueue.replaceRange(0, shuffledQueue.length, ids);
     currentShuffleIndex = 0;
   }
 

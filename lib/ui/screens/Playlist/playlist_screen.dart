@@ -1,3 +1,4 @@
+import '../../../utils/smart_shuffle.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -360,12 +361,16 @@ class PlaylistScreen extends StatelessWidget {
                                           IconButton(
                                               tooltip: "shuffle".tr,
                                               onPressed: () {
-                                                final songsToplay =
-                                                    List<MediaItem>.from(
-                                                        playlistController
-                                                            .songList);
-                                                songsToplay.shuffle();
-                                                songsToplay.shuffle();
+                                                final songsToplay = smartShuffle<
+                                                        MediaItem>(
+                                                    playlistController
+                                                        .songList,
+                                                    artistOf: (e) => (e.artist ??
+                                                            '')
+                                                        .split(',')
+                                                        .first
+                                                        .trim()
+                                                        .toLowerCase());
                                                 playerController.playPlayListSong(
                                                     songsToplay, 0,
                                                     playfrom: PlaylingFrom(
