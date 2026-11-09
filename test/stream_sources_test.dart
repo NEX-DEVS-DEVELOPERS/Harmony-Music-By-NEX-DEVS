@@ -70,7 +70,7 @@ void main() {
   });
 
   test('validate: OK for a working url, reason for 403/empty', () async {
-    final data = Uint8List(5000);
+    final data = Uint8List(5000)..setRange(0, 4, [0x1A, 0x45, 0xDF, 0xA3]);
     final s = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     s.listen((req) async {
       switch (req.uri.path) {

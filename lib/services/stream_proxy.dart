@@ -231,7 +231,9 @@ class StreamProxy {
     try {
       if (shouldProxy(url)) {
         final bytes = await _fetchChunk(Uri.parse(url), 0, 2047);
-        return bytes.isEmpty ? 'empty response' : null;
+        if (bytes.isEmpty) return 'empty response';
+        final bad = notAudioReason(bytes);
+        return bad == null ? null : 'server sent $bad';
       }
       final request = await _client.getUrl(Uri.parse(url));
       _headersFor[url]?.forEach((k, v) => request.headers.set(k, v));
@@ -249,6 +251,32 @@ class StreamProxy {
     } catch (e) {
       return e.toString().replaceAll('\n', ' ');
     }
+  }
+
+  /// Recognises audio containers by their first bytes (WebM/Matroska, MP4/M4A,
+  /// Ogg, MP3, ADTS-AAC, WAV, FLAC). Returns null if it looks like audio,
+  /// otherwise a description of what the data starts with (e.g. an HTML
+  /// error page), so a bad download is reported instead of played silently.
+  static String? notAudioReason(List<int> head) {
+    if (head.length < 4) return 'data too short (${head.length} bytes)';
+    bool starts(List<int> sig, [int at = 0]) {
+      if (head.length < at + sig.length) return false;
+      for (var i = 0; i < sig.length; i++) {
+        if (head[at + i] != sig[i]) return false;
+      }
+      return true;
+    }
+
+    if (starts([0x1A, 0x45, 0xDF, 0xA3])) return null; // WebM / Matroska
+    if (starts([0x66, 0x74, 0x79, 0x70], 4)) return null; // MP4 'ftyp'
+    if (starts([0x4F, 0x67, 0x67, 0x53])) return null; // Ogg
+    if (starts([0x49, 0x44, 0x33])) return null; // MP3 (ID3)
+    if (head[0] == 0xFF && (head[1] & 0xE0) == 0xE0) return null; // MP3/AAC
+    if (starts([0x52, 0x49, 0x46, 0x46])) return null; // WAV
+    if (starts([0x66, 0x4C, 0x61, 0x43])) return null; // FLAC
+    final text = String.fromCharCodes(
+        head.take(60).map((b) => (b >= 32 && b < 127) ? b : 46));
+    return 'not audio, starts with "$text"';
   }
 
   /// Downloads the whole stream to [path] (in [chunk]-sized range requests) and
@@ -276,11 +304,19 @@ class StreamProxy {
         if (bytes.isEmpty) {
           throw const HttpException('server returned no data');
         }
+        if (pos == 0) {
+          final bad = notAudioReason(bytes);
+          if (bad != null) throw HttpException('server sent $bad');
+        }
         sink.add(bytes);
         pos += bytes.length;
         onProgress?.call(pos, total);
       }
       await sink.close();
+      if (await tmp.length() != total) {
+        throw HttpException(
+            'incomplete download (${await tmp.length()} of $total bytes)');
+      }
       if (await file.exists()) await file.delete();
       return await tmp.rename(path).then((f) => File(f.path));
     } catch (e) {
