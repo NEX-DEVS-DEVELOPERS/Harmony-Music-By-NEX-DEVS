@@ -488,6 +488,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
               errorMessage: streamInfo.statusMSG));
           return;
         }
+        _registerForProxy(streamInfo.audio);
         currentSongUrl = currentSong.extras!['url'] = streamInfo.audio!.url;
         playbackState
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
@@ -567,6 +568,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
               .copyWith(processingState: AudioProcessingState.error));
           return;
         }
+        _registerForProxy(streamInfo.audio);
         currentSongUrl = currMed.extras!['url'] = streamInfo.audio!.url;
 
         await _playList.add(await _createAudioSource(currMed));
@@ -806,9 +808,25 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
 // Work around used [useNewInstanceOfExplode = false] to Fix Connection closed before full header was received issue
+  /// The stream lookup runs in another isolate, so tell this isolate's
+  /// proxy about the headers / size the URL needs.
+  void _registerForProxy(Audio? audio) {
+    if (audio == null) return;
+    if (audio.headers != null) {
+      StreamProxy.instance.rememberHeaders(audio.url, audio.headers!);
+    }
+    StreamProxy.instance.rememberSize(audio.url, audio.size);
+  }
+
   Future<HMStreamingData> checkNGetUrl(String songId,
       {bool generateNewUrl = false, bool offlineReplacementUrl = false}) async {
     printINFO("Requested id : $songId");
+    // Links cached by older builds may be broken: drop them once.
+    final prefs = Hive.box('AppPrefs');
+    if (prefs.get('streamUrlCacheVersion') != 2) {
+      await Hive.box("SongsUrlCache").clear();
+      await prefs.put('streamUrlCacheVersion', 2);
+    }
     final songDownloadsBox = Hive.box("SongDownloads");
     if (!offlineReplacementUrl &&
         (await Hive.openBox("SongsCache")).containsKey(songId)) {

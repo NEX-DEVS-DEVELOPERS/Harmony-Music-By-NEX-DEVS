@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../utils/helper.dart';
+import 'stream_proxy.dart';
+import 'stream_sources.dart';
 
 class StreamProvider {
   final bool playable;
@@ -10,7 +12,59 @@ class StreamProvider {
   StreamProvider(
       {required this.playable, this.audioFormats, this.statusMSG = ""});
 
+  /// Finds a playable audio stream for [videoId], trying several sources in
+  /// order and only accepting one that really delivers audio bytes:
+  ///  1. YouTube directly (youtube_explode_dart)
+  ///  2. public Piped servers   3. public Invidious servers
+  ///  4. yt-dlp (desktop only; downloaded once on first need)
   static Future<StreamProvider> fetch(String videoId) async {
+    final errors = <String>[];
+
+    // 1. YouTube directly
+    final direct = await _fetchDirect(videoId);
+    if (direct.playable) {
+      final problem =
+          await StreamProxy.instance.validate(direct.highestQualityAudio!.url);
+      if (problem == null) return direct;
+      errors.add('YouTube: $problem');
+    } else {
+      errors.add('YouTube: ${direct.statusMSG}');
+    }
+
+    // 2 + 3. public frontends (run at the same time, first working one wins)
+    final frontend = await firstSuccess<List<Audio>>([
+      FrontendSources.piped(videoId, errors),
+      FrontendSources.invidious(videoId, errors),
+    ]);
+    if (frontend != null) {
+      printINFO('Stream for $videoId from a Piped/Invidious server');
+      return StreamProvider(
+          playable: true, statusMSG: "OK", audioFormats: frontend);
+    }
+
+    // 4. yt-dlp
+    final ytdlp = await YtDlpSource.resolve(videoId, errors);
+    if (ytdlp != null) {
+      printINFO('Stream for $videoId from yt-dlp');
+      return StreamProvider(
+          playable: true, statusMSG: "OK", audioFormats: ytdlp);
+    }
+
+    printERROR('All stream sources failed for $videoId: ${errors.join(' | ')}');
+    // keep the specific, user-friendly message for network / unplayable cases
+    if (!direct.playable &&
+        (direct.statusMSG == 'networkError' ||
+            direct.statusMSG.contains('purchase') ||
+            direct.statusMSG.contains('unavailable'))) {
+      return direct;
+    }
+    final detail = errors.join(' | ');
+    return StreamProvider(
+        playable: false,
+        statusMSG: 'Could not get audio. ${detail.length > 260 ? '${detail.substring(0, 260)}...' : detail}');
+  }
+
+  static Future<StreamProvider> _fetchDirect(String videoId) async {
     final yt = YoutubeExplode();
 
     try {
@@ -112,8 +166,12 @@ class Audio {
   final int size;
   final double loudnessDb;
   final String url;
+
+  /// Extra request headers the stream URL needs (yt-dlp provides some).
+  final Map<String, String>? headers;
   Audio(
-      {required this.itag,
+      {this.headers,
+      required this.itag,
       required this.audioCodec,
       required this.bitrate,
       required this.duration,
@@ -128,7 +186,8 @@ class Audio {
         "loudnessDb": loudnessDb,
         "url": url,
         "approxDurationMs": duration,
-        "size": size
+        "size": size,
+        if (headers != null) "headers": headers
       };
 
   factory Audio.fromJson(json) => Audio(
@@ -140,6 +199,8 @@ class Audio {
       bitrate: json["bitrate"] ?? 0,
       loudnessDb: (json['loudnessDb'])?.toDouble() ?? 0.0,
       url: json['url'],
+      headers: (json['headers'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       size: json["size"] ?? 0);
 }
 

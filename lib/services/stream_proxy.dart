@@ -25,6 +25,16 @@ class StreamProxy {
   /// Size of each upstream range request.
   static const chunkSize = 10 * 1024 * 1024;
 
+  /// Extra info about specific upstream URLs (set by the stream resolvers).
+  final Map<String, Map<String, String>> _headersFor = {};
+  final Map<String, int> _sizeFor = {};
+
+  void rememberHeaders(String url, Map<String, String> headers) =>
+      _headersFor[url] = headers;
+  void rememberSize(String url, int size) {
+    if (size > 0) _sizeFor[url] = size;
+  }
+
   HttpServer? _server;
   Future<HttpServer>? _starting;
   final HttpClient _client = HttpClient()
@@ -83,6 +93,7 @@ class StreamProxy {
       }
       final upstream = Uri.parse(utf8.decode(base64Url.decode(encoded)));
       final total = int.tryParse(upstream.queryParameters['clen'] ?? '') ??
+          _sizeFor[upstream.toString()] ??
           await _probeLength(upstream);
       if (total == null || total <= 0) {
         res.statusCode = HttpStatus.badGateway;
@@ -170,6 +181,8 @@ class StreamProxy {
                 'range': '$from-$to',
               });
         final request = await _client.getUrl(uri);
+        _headersFor[upstream.toString()]
+            ?.forEach((k, v) => request.headers.set(k, v));
         if (isAndroid) {
           request.headers.set(HttpHeaders.rangeHeader, 'bytes=$from-$to');
         }
@@ -199,6 +212,8 @@ class StreamProxy {
   Future<int?> _probeLength(Uri upstream) async {
     try {
       final request = await _client.getUrl(upstream);
+      _headersFor[upstream.toString()]
+          ?.forEach((k, v) => request.headers.set(k, v));
       request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-0');
       final response = await request.close();
       await response.drain();
@@ -207,6 +222,32 @@ class StreamProxy {
       return m == null ? null : int.parse(m.group(1)!);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Checks that [url] really delivers audio bytes. Returns `null` when OK,
+  /// otherwise a short human-readable reason (used for diagnostics).
+  Future<String?> validate(String url) async {
+    try {
+      if (shouldProxy(url)) {
+        final bytes = await _fetchChunk(Uri.parse(url), 0, 2047);
+        return bytes.isEmpty ? 'empty response' : null;
+      }
+      final request = await _client.getUrl(Uri.parse(url));
+      _headersFor[url]?.forEach((k, v) => request.headers.set(k, v));
+      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-2047');
+      final response =
+          await request.close().timeout(const Duration(seconds: 10));
+      final code = response.statusCode;
+      var got = 0;
+      await for (final d in response) {
+        got += d.length;
+        if (got > 0) break;
+      }
+      if (code >= 400) return 'HTTP $code';
+      return got == 0 ? 'empty response' : null;
+    } catch (e) {
+      return e.toString().replaceAll('\n', ' ');
     }
   }
 }

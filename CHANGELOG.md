@@ -1,4 +1,6 @@
 # 1.12.4
+* **Multiple stream sources** (no more relying on one YouTube method): the app now tries, in order, YouTube directly, public Piped servers, public Invidious servers, and (desktop only) `yt-dlp`, and only uses a source after actually fetching audio bytes from it. If everything fails, the on-screen message lists why each source failed. `yt-dlp` is downloaded once from the official yt-dlp GitHub releases into the app's data folder the first time it is needed.
+* Stream links cached by earlier builds are cleared once, so a previously bad link can't be reused.
 * **Reliable playback**: audio is now played/downloaded through a small built-in local proxy that fetches YouTube streams in chunks like youtube_explode_dart does (YouTube rejects whole-file requests, which left songs stuck at 0:00). Playback errors are now shown on screen instead of failing silently.
 * Listen & identify (mic) button is now on the desktop search bar too.
 * **Headset / media keys (Windows)**: play/pause, next (double tap) and previous buttons on a headset or keyboard now control Harmony only; Harmony claims the keys with Windows so a browser tab playing video can't take them. Can be turned off in Settings -> "Headset & media keys".
