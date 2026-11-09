@@ -1,3 +1,6 @@
+# 1.12.5
+* **Root cause of "upstream HTTP 403"**: in Aug 2026 YouTube stopped serving audio to the client the library uses by default (`androidSdkless`), so a stream could be *found* but its real download was refused ([youtube_explode_dart#386](https://github.com/Hexer10/youtube_explode_dart/issues/386)). On Windows/Linux the app now asks `yt-dlp` first (it is updated within days of such changes), then YouTube directly, then Piped/Invidious. Every source is verified with a real range request, including one from the middle of the file, before it is used.
+
 # 1.12.4
 * **Fixed "upstream HTTP 403" when loading a song**: links from Piped / Invidious / yt-dlp are signed, and the downloader was adding a `range=` parameter to them, which those servers reject. Only YouTube's own servers get that parameter now; every other link is left untouched and a plain `Range` header is used. The source check now also tests a piece from the middle of the file with the same method, so a source that only fails later is skipped. Regression tests use a server that returns 403 if the link is modified.
 * **Bad audio is caught**: before a song is played, its first bytes are checked to be a real audio file, and the finished download must be complete. A server answer that isn't audio (e.g. an error page) now shows "server sent not audio, starts with ..." instead of playing silently.

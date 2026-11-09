@@ -34,8 +34,27 @@ class StreamProvider {
     final errors = <String>[];
     void status(String m) => onStatus?.call(m);
 
+    // 0. Desktop: yt-dlp first. YouTube's servers changed in Aug 2026 and the
+    // library's default client now gets HTTP 403 on audio; yt-dlp is updated
+    // within days of such changes, so it is the most dependable source.
+    final desktop = Platform.isWindows || Platform.isLinux;
+    if (desktop) {
+      status('Finding the song (first time downloads a ~18 MB helper)...');
+      final ytdlp = await YtDlpSource.resolve(videoId, errors).timeout(
+          const Duration(seconds: 150), onTimeout: () {
+        errors.add('yt-dlp: timed out');
+        return null;
+      });
+      if (ytdlp != null) {
+        printINFO('Stream for $videoId from yt-dlp');
+        return StreamProvider(
+            playable: true, statusMSG: "OK", audioFormats: ytdlp);
+      }
+      status('That didn\'t work - trying other sources...');
+    }
+
     // 1. YouTube directly
-    status('Finding the song on YouTube...');
+    if (!desktop) status('Finding the song on YouTube...');
     final direct = await _fetchDirect(videoId).timeout(
         const Duration(seconds: 25),
         onTimeout: () => StreamProvider(
@@ -64,21 +83,6 @@ class StreamProvider {
       printINFO('Stream for $videoId from a Piped/Invidious server');
       return StreamProvider(
           playable: true, statusMSG: "OK", audioFormats: frontend);
-    }
-
-    // 4. yt-dlp (desktop)
-    if (Platform.isWindows || Platform.isLinux) {
-      status('Switching to yt-dlp (first time may download ~18 MB)...');
-      final ytdlp = await YtDlpSource.resolve(videoId, errors).timeout(
-          const Duration(seconds: 150), onTimeout: () {
-        errors.add('yt-dlp: timed out');
-        return null;
-      });
-      if (ytdlp != null) {
-        printINFO('Stream for $videoId from yt-dlp');
-        return StreamProvider(
-            playable: true, statusMSG: "OK", audioFormats: ytdlp);
-      }
     }
 
     printERROR('All stream sources failed for $videoId: ${errors.join(' | ')}');
