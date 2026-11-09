@@ -6,13 +6,15 @@
 #endif
 
 [Setup]
-AppId={{B9F6E402-0CAE-4045-BDE6-14BD6C39C4EA}
+; Same AppId + folder as the original Harmony Music installer, so installing this
+; UPGRADES an existing install in place (your library in %APPDATA% is kept).
+AppId=B9F6E402-0CAE-4045-BDE6-14BD6C39C4EA
 AppVersion={#MyAppVersion}
 AppName=Harmony Music
 AppPublisher=NEX-DEVS
 AppPublisherURL=https://github.com/NEX-DEVS-DEVELOPERS/Harmony-Music-By-NEX-DEVS
 AppSupportURL=https://github.com/NEX-DEVS-DEVELOPERS/Harmony-Music-By-NEX-DEVS/issues
-DefaultDirName={autopf}\Harmony Music
+DefaultDirName={autopf}\harmonymusic
 DisableProgramGroupPage=yes
 SourceDir=..\..
 OutputDir=dist
@@ -23,11 +25,12 @@ SetupIconFile=windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\harmonymusic.exe
 WizardStyle=modern
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 LicenseFile=LICENSE
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=yes
+CloseApplications=force
+RestartApplications=no
+UsePreviousAppDir=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

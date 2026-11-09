@@ -1,3 +1,4 @@
+import '/services/windows_audio_service.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -46,6 +47,7 @@ class SettingsScreenController extends GetxController {
   final backgroundPlayEnabled = true.obs;
   final keepScreenAwake = false.obs;
   final restorePlaybackSession = false.obs;
+  final captureMediaKeys = true.obs;
   final cacheHomeScreenData = true.obs;
   final currentVersion = "V1.12.2";
 
@@ -99,6 +101,7 @@ class SettingsScreenController extends GetxController {
     autoOpenPlayer.value = (setBox.get("autoOpenPlayer") ?? true);
     restorePlaybackSession.value =
         setBox.get("restrorePlaybackSession") ?? false;
+    captureMediaKeys.value = setBox.get("captureMediaKeys") ?? true;
     cacheHomeScreenData.value = setBox.get("cacheHomeScreenData") ?? true;
     streamingQuality.value =
         AudioQuality.values[setBox.get('streamingQuality')];
@@ -266,6 +269,15 @@ class SettingsScreenController extends GetxController {
     Get.find<PlayerController>().toggleLoudnessNormalization(val);
     setBox.put("loudnessNormalizationEnabled", val);
     loudnessNormalizationEnabled.value = val;
+  }
+
+  /// Headset / keyboard media keys captured for Harmony only (Windows).
+  void toggleCaptureMediaKeys(bool val) {
+    setBox.put("captureMediaKeys", val);
+    captureMediaKeys.value = val;
+    if (Get.isRegistered<WindowsAudioService>()) {
+      Get.find<WindowsAudioService>().setMediaKeysCapture(val);
+    }
   }
 
   void toggleRestorePlaybackSession(bool val) {

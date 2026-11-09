@@ -1,4 +1,6 @@
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:hive/hive.dart';
 import 'package:harmonymusic/utils/helper.dart';
 import 'package:smtc_windows/smtc_windows.dart';
 
@@ -8,10 +10,48 @@ class WindowsAudioService extends GetxService {
   late SMTCWindows smtc;
   final playerController = Get.find<PlayerController>();
 
+  static const _mediaKeys = MethodChannel('harmony/media_keys');
+
   @override
   void onInit() {
     _initService();
+    _initMediaKeys();
     super.onInit();
+  }
+
+  /// Claim the global media keys (headset buttons etc.) for Harmony so other
+  /// apps, e.g. a browser playing a video, don't take them.
+  void _initMediaKeys() {
+    _mediaKeys.setMethodCallHandler((call) async {
+      if (call.method != 'onKey') return;
+      switch (call.arguments) {
+        case 'playPause':
+          playerController.playPause();
+          break;
+        case 'next':
+          playerController.next();
+          break;
+        case 'previous':
+          playerController.prev();
+          break;
+        case 'stop':
+          playerController.pause();
+          break;
+      }
+    });
+    final enabled = Hive.box('AppPrefs').get('captureMediaKeys') ?? true;
+    setMediaKeysCapture(enabled);
+  }
+
+  Future<void> setMediaKeysCapture(bool enable) async {
+    try {
+      final ok = await _mediaKeys.invokeMethod<bool>(enable ? 'enable' : 'disable');
+      if (enable && ok != true) {
+        printERROR("Some media keys are already owned by another app");
+      }
+    } catch (e) {
+      printERROR("Media key capture failed: $e");
+    }
   }
 
   _initService() {
@@ -81,6 +121,7 @@ class WindowsAudioService extends GetxService {
 
   @override
   void onClose() {
+    setMediaKeysCapture(false);
     smtc.clearMetadata();
     smtc.disableSmtc();
     smtc.dispose();
