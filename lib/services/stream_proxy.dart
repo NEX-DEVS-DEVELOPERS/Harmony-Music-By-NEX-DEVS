@@ -169,21 +169,30 @@ class StreamProxy {
   /// Fetches bytes [from]..[to] (inclusive) with retries.
   Future<List<int>> _fetchChunk(Uri upstream, int from, int to) async {
     Object? lastError;
+    // Which way to ask for a byte range:
+    //  * YouTube's own servers (googlevideo.com): `c=ANDROID` links want a
+    //    Range header, the others a `range` query parameter (same rule as
+    //    youtube_explode_dart).
+    //  * Everything else (Piped / Invidious / yt-dlp links) is SIGNED: the URL
+    //    must not be touched at all, so only a Range header is used. Adding a
+    //    `range=` parameter there gives HTTP 403.
+    final isGoogleVideo = upstream.host.endsWith('googlevideo.com');
+    final preferQuery =
+        isGoogleVideo && upstream.queryParameters['c'] != 'ANDROID';
     for (var attempt = 0; attempt < 4; attempt++) {
       try {
-        // For c=ANDROID URLs YouTube wants a Range header; for the others the
-        // `range` query parameter (same rule as youtube_explode_dart).
-        final isAndroid = upstream.queryParameters['c'] == 'ANDROID';
-        final uri = isAndroid
-            ? upstream
-            : upstream.replace(queryParameters: {
+        // on retries of YouTube links, also try the other style
+        final useQuery = isGoogleVideo && (attempt.isEven ? preferQuery : !preferQuery);
+        final uri = useQuery
+            ? upstream.replace(queryParameters: {
                 ...upstream.queryParameters,
                 'range': '$from-$to',
-              });
+              })
+            : upstream;
         final request = await _client.getUrl(uri);
         _headersFor[upstream.toString()]
             ?.forEach((k, v) => request.headers.set(k, v));
-        if (isAndroid) {
+        if (!useQuery) {
           request.headers.set(HttpHeaders.rangeHeader, 'bytes=$from-$to');
         }
         final response = await request.close();
@@ -195,10 +204,13 @@ class StreamProxy {
         await for (final data in response) {
           builder.add(data);
         }
-        final bytes = builder.takeBytes();
+        var bytes = builder.takeBytes();
         // Servers that ignore the range and send the whole file: slice it.
         if (response.statusCode == 200 && from > 0) {
-          return bytes.sublist(from, (to + 1).clamp(0, bytes.length));
+          bytes = bytes.sublist(from.clamp(0, bytes.length),
+              (to + 1).clamp(0, bytes.length));
+        } else if (bytes.length > to - from + 1) {
+          bytes = bytes.sublist(0, to - from + 1);
         }
         return bytes;
       } catch (e) {
@@ -229,27 +241,26 @@ class StreamProxy {
   /// otherwise a short human-readable reason (used for diagnostics).
   Future<String?> validate(String url) async {
     try {
-      if (shouldProxy(url)) {
-        final bytes = await _fetchChunk(Uri.parse(url), 0, 2047);
-        if (bytes.isEmpty) return 'empty response';
-        final bad = notAudioReason(bytes);
-        return bad == null ? null : 'server sent $bad';
+      final uri = Uri.parse(url);
+      final head = await _fetchChunk(uri, 0, 2047);
+      if (head.isEmpty) return 'empty response';
+      final bad = notAudioReason(head);
+      if (bad != null) return 'server sent $bad';
+
+      // Also try a piece from the middle of the file with the SAME method the
+      // real download uses, so a source that only fails later is rejected now.
+      final total = int.tryParse(uri.queryParameters['clen'] ?? '') ??
+          _sizeFor[url] ??
+          0;
+      if (total > 3 * 1024 * 1024) {
+        final mid = total ~/ 2;
+        final piece = await _fetchChunk(uri, mid, mid + 2047);
+        if (piece.isEmpty) return 'empty response in the middle of the file';
       }
-      final request = await _client.getUrl(Uri.parse(url));
-      _headersFor[url]?.forEach((k, v) => request.headers.set(k, v));
-      request.headers.set(HttpHeaders.rangeHeader, 'bytes=0-2047');
-      final response =
-          await request.close().timeout(const Duration(seconds: 10));
-      final code = response.statusCode;
-      var got = 0;
-      await for (final d in response) {
-        got += d.length;
-        if (got > 0) break;
-      }
-      if (code >= 400) return 'HTTP $code';
-      return got == 0 ? 'empty response' : null;
+      return null;
     } catch (e) {
-      return e.toString().replaceAll('\n', ' ');
+      final msg = e is HttpException ? e.message : e.toString();
+      return msg.replaceFirst('upstream ', '').replaceAll('\n', ' ');
     }
   }
 
