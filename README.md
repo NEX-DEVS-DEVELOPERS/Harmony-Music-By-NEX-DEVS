@@ -15,6 +15,8 @@ Our mission is to breathe new life into this project, ensuring it remains a top-
 - **Open Source Integrity**: The project remains open source under the **GPL 3.0** license.
 - **Sustainability**: We plan to improve the project for our users and explore sustainable ways to support its long-term development while maintaining its open-source roots.
 
+> ✅ **Search is fixed (v1.12.3).** Searching for new music used to load forever. The cause was found and fixed - see the [changelog](CHANGELOG.md). Update to the latest build to get it.
+
 A cross platform app for music streaming made with Flutter(Android, Windows, linux).
 
 # Features

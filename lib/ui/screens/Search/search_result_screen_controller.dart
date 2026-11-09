@@ -52,39 +52,48 @@ class SearchResultScreenController extends GetxController
             separatedResultContent[railItems[value - 1]].isEmpty)) {
       final tabName = railItems[value - 1];
       final itemCount = (tabName == 'Songs' || tabName == 'Videos') ? 25 : 10;
-      final x = await musicServices.search(queryString.value,
-          filter: tabName.replaceAll(" ", "_").toLowerCase(), limit: itemCount, filterParams: resultContent['searchEndpoint'][tabName]);
-      separatedResultContent[tabName] = x[tabName];
-      additionalParamNext[tabName] = x['params'];
-      isSeparatedResultContentFetced.value = true;
-      final scrollController = scrollControllers[tabName];
-      (scrollController)!.addListener(() {
-        double maxScroll = scrollController.position.maxScrollExtent;
-        double currentScroll = scrollController.position.pixels;
-        if (currentScroll >= maxScroll / 2 &&
-            additionalParamNext[tabName]['additionalParams'] !=
-                '&ctoken=null&continuation=null') {
-          if (!continuationInProgress) {
-            printINFO("Acchhsk");
-            continuationInProgress = true;
-            getContinuationContents();
+      try {
+        final x = await musicServices.search(queryString.value,
+            filter: tabName.replaceAll(" ", "_").toLowerCase(),
+            limit: itemCount,
+            filterParams: resultContent['searchEndpoint']?[tabName]);
+        separatedResultContent[tabName] = x[tabName] ?? [];
+        additionalParamNext[tabName] = x['params'];
+        final scrollController = scrollControllers[tabName];
+        scrollController?.addListener(() {
+          double maxScroll = scrollController.position.maxScrollExtent;
+          double currentScroll = scrollController.position.pixels;
+          if (currentScroll >= maxScroll / 2 &&
+              additionalParamNext[tabName] != null &&
+              additionalParamNext[tabName]['additionalParams'] !=
+                  '&ctoken=null&continuation=null') {
+            if (!continuationInProgress) {
+              continuationInProgress = true;
+              getContinuationContents();
+            }
           }
-        }
-      });
+        });
+      } catch (e) {
+        printERROR("Search tab '$tabName' failed: $e");
+        separatedResultContent[tabName] = [];
+      }
     }
     isSeparatedResultContentFetced.value = true;
   }
 
   Future<void> getContinuationContents() async {
     final tabName = railItems[navigationRailCurrentIndex.value - 1];
-
-    final x =
-        await musicServices.getSearchContinuation(additionalParamNext[tabName]);
-    (separatedResultContent[tabName]).addAll(x[tabName]);
-    additionalParamNext[tabName] = x['params'];
-    separatedResultContent.refresh();
-
-    continuationInProgress = false;
+    try {
+      final x = await musicServices
+          .getSearchContinuation(additionalParamNext[tabName]);
+      (separatedResultContent[tabName]).addAll(x[tabName]);
+      additionalParamNext[tabName] = x['params'];
+      separatedResultContent.refresh();
+    } catch (e) {
+      printERROR("Search continuation failed: $e");
+    } finally {
+      continuationInProgress = false;
+    }
   }
 
   void viewAllCallback(String text) {
@@ -96,7 +105,14 @@ class SearchResultScreenController extends GetxController
     final args = Get.arguments;
     if (args != null) {
       queryString.value = args;
-      resultContent.value = await musicServices.search(args);
+      try {
+        resultContent.value = await musicServices.search(args);
+      } catch (e) {
+        // Previously an exception here left the loading indicator spinning
+        // forever. Fall through with empty results so the UI shows "no match".
+        printERROR("Search failed: $e");
+        resultContent.value = {};
+      }
       final allKeys = resultContent.keys.where((element) => ([
             "Songs",
             "Videos",

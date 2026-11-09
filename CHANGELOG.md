@@ -1,3 +1,11 @@
+# 1.12.3
+* **Fixed search** - searching for new music no longer loads forever. Root causes found by reproducing against the live YouTube Music API:
+  * The search parser crashed on result entries that have no `flexColumns` (e.g. the "No results" message and card shelves), and the exception left the loading spinner running forever. Parsing is now null-safe and skips malformed entries; the search screen always finishes (shows "no match" on failure).
+  * Profiles, Podcasts and Episodes were mis-parsed as bogus "Albums"; they are now ignored.
+  * Filtered tabs (Videos, Artists, Playlists...) crashed while paging for more results with YouTube Music's new response layout.
+* **Fixed build** - removed `ionicons_flutter` (extends the now-`final` `IconData`, so the app no longer compiled on current Flutter); replaced the 3 icons used with Material icons.
+* Added Linux build to CI and a one-time in-app notice that search is fixed.
+
 # 1.12.2
 * Added wakelock support to keep screen awake while playing music (can be toggled from settings)
 * Enabled downloading in external storage for Android devices

@@ -33,6 +33,28 @@ class HomeScreenController extends GetxController {
     super.onInit();
     loadContent();
     if (updateCheckFlag) _checkNewVersion();
+    _showSearchFixNotice();
+  }
+
+  /// One-time notice telling users that the "search never finishes" bug is fixed.
+  void _showSearchFixNotice() {
+    const prefKey = 'searchFixNoticeShown_v1_12_3';
+    final box = Hive.box("AppPrefs");
+    if (box.get(prefKey) == true) return;
+    Future.delayed(const Duration(seconds: 3), () {
+      if (Get.context == null) return;
+      box.put(prefKey, true);
+      Get.dialog(AlertDialog(
+        title: const Text("Search is fixed 🎉"),
+        content: const Text(
+            "Searching for new songs, videos, artists and playlists was broken "
+            "(results kept loading forever). That bug is now fixed - go ahead "
+            "and search for something new!"),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text("Got it"))
+        ],
+      ));
+    });
   }
 
   Future<void> loadContent() async {
