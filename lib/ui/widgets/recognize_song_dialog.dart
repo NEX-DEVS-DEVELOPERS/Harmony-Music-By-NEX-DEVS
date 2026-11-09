@@ -156,6 +156,13 @@ class _RecognizeSongDialogState extends State<RecognizeSongDialog> {
       case _Phase.notFound:
         body = Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Could not recognise that song.', style: style.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+              'The microphone heard sound (${_service.lastMaxLevelDb.toStringAsFixed(0)} dB), '
+              'but the song was not matched. Play it louder / closer to the '
+              'microphone, avoid talking over it, and try again.',
+              style: style.bodySmall,
+              textAlign: TextAlign.center),
           const SizedBox(height: 14),
           ElevatedButton(onPressed: _listen, child: const Text('Try again')),
         ]);

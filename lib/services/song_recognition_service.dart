@@ -38,6 +38,13 @@ class RecognitionException implements Exception {
 class SongRecognitionService {
   static const _tokenKey = 'auddApiToken';
   final AudioRecorder _recorder = AudioRecorder();
+
+  /// Loudest level (dBFS, 0 = max, about -160 = silence) heard during the last
+  /// recording. Used to tell "microphone heard nothing" from "song not found".
+  double lastMaxLevelDb = -160;
+
+  /// Below this the microphone basically recorded silence.
+  static const silenceThresholdDb = -50.0;
   final Dio _dio = Dio();
 
   static String? get apiToken {
@@ -64,7 +71,7 @@ class SongRecognitionService {
   /// Records [listenFor] of audio and identifies it. Returns `null` when the
   /// song could not be recognised.
   Future<RecognizedSong?> listenAndIdentify({
-    Duration listenFor = const Duration(seconds: 8),
+    Duration listenFor = const Duration(seconds: 10),
     void Function()? onListeningDone,
   }) async {
     final token = apiToken;
@@ -84,11 +91,25 @@ class SongRecognitionService {
       path: path,
     );
     final startedAt = DateTime.now();
-    await Future.delayed(listenFor);
+    lastMaxLevelDb = -160;
+    while (DateTime.now().difference(startedAt) < listenFor) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      try {
+        final amp = await _recorder.getAmplitude();
+        if (amp.current > lastMaxLevelDb) lastMaxLevelDb = amp.current;
+      } catch (_) {}
+    }
     final recorded = await _recorder.stop();
     onListeningDone?.call();
     if (recorded == null) {
       throw RecognitionException('Could not record audio');
+    }
+    if (lastMaxLevelDb < silenceThresholdDb) {
+      throw RecognitionException(
+          'The microphone heard almost no sound. On Windows open Settings > '
+          'Privacy & security > Microphone and allow desktop apps, and check '
+          'the right input device is selected. Then play the music near the '
+          'microphone and try again.');
     }
 
     try {

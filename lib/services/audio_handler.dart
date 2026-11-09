@@ -923,9 +923,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         });
         Map<String, dynamic> streamInfoJson;
         try {
-          streamInfoJson = await Isolate.run(
-                  () => getStreamInfo(songId, token, statusPort.sendPort))
-              .timeout(const Duration(seconds: 220));
+          streamInfoJson =
+              await runStreamLookup(songId, token, statusPort.sendPort)
+                  .timeout(const Duration(seconds: 220));
         } catch (e) {
           streamInfoJson = {
             "playable": false,

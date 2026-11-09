@@ -45,3 +45,16 @@ Future<Map<String, dynamic>> getStreamInfo(String songId, dynamic token,
     };
   }
 }
+
+/// Runs the stream lookup in a background isolate and reports progress over
+/// [statusPort].
+///
+/// IMPORTANT: this is a separate function on purpose. `Isolate.run` copies
+/// everything its closure captures; if the closure were created next to the
+/// `ReceivePort` (as it used to be inside `checkNGetUrl`) it would capture the
+/// ReceivePort too, which cannot be sent to another isolate
+/// ("object is unsendable") and made every song lookup fail instantly.
+Future<Map<String, dynamic>> runStreamLookup(
+    String songId, dynamic token, SendPort statusPort) {
+  return Isolate.run(() => getStreamInfo(songId, token, statusPort));
+}
