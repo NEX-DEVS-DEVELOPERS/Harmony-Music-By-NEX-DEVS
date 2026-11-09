@@ -1,3 +1,7 @@
+# 1.12.4
+* **Smart shuffle** (Spotify-style): true random order, every song plays once before any repeats, songs by the same artist are spread apart, a new cycle never starts with the song that just played, "previous" on the first shuffled song restarts it. Also used by the playlist shuffle button.
+* **Windows installer**: CI now builds a real `HarmonyMusic-Setup-<version>.exe` installer and publishes it (with the APK and Linux build) as a GitHub Release, so no zip is needed.
+
 # 1.12.3
 * **Fixed search** - searching for new music no longer loads forever. Root causes found by reproducing against the live YouTube Music API:
   * The search parser crashed on result entries that have no `flexColumns` (e.g. the "No results" message and card shelves), and the exception left the loading spinner running forever. Parsing is now null-safe and skips malformed entries; the search screen always finishes (shows "no match" on failure).
