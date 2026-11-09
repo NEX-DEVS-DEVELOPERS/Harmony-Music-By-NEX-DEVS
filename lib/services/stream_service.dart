@@ -40,8 +40,8 @@ class StreamProvider {
     final desktop = Platform.isWindows || Platform.isLinux;
     if (desktop) {
       status('Finding the song (first time downloads a ~18 MB helper)...');
-      final ytdlp = await YtDlpSource.resolve(videoId, errors).timeout(
-          const Duration(seconds: 150), onTimeout: () {
+      final ytdlp = await YtDlpSource.downloadAudio(videoId, errors).timeout(
+          const Duration(seconds: 200), onTimeout: () {
         errors.add('yt-dlp: timed out');
         return null;
       });

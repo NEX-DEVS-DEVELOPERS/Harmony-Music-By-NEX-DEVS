@@ -59,7 +59,7 @@ void main() {
     final up = await _signedServer(data, forbidMiddleFrom: 1024 * 1024);
     final url =
         'http://127.0.0.1:${up.port}/videoplayback?expire=99&sig=abc%3D%3D&clen=${data.length}';
-    expect(await StreamProxy.instance.validate(url), 'HTTP 403');
+    expect(await StreamProxy.instance.validate(url), startsWith('HTTP 403'));
     await up.close(force: true);
   });
 }

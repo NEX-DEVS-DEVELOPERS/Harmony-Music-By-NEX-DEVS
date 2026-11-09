@@ -320,4 +320,131 @@ class YtDlpSource {
       return null;
     }
   }
+
+  /// Lets yt-dlp itself download the audio to a local file and returns it as a
+  /// single [Audio] whose `url` is that file's path.
+  ///
+  /// This is the most dependable route: yt-dlp knows all of YouTube's current
+  /// quirks (clients, tokens, chunking, headers), so our own download code
+  /// is not involved at all. [binary] / [outDir] are for tests.
+  static Future<List<Audio>?> downloadAudio(
+      String videoId, List<String> errors,
+      {String? binary, Directory? outDir}) async {
+    try {
+      final bin = binary ?? await _binary(errors);
+      if (bin == null) return null;
+      final dir = outDir ??
+          Directory('${(await getTemporaryDirectory()).path}/harmony_stream');
+      await dir.create(recursive: true);
+
+      // reuse a complete file downloaded earlier (yt-dlp only gives a final
+      // name once the download finished)
+      File? found = _findAudioFile(dir, videoId);
+      if (found != null) {
+        final reuse = await _checkAudioFile(found);
+        if (reuse == null) return [_audioFor(found)];
+        await found.delete();
+      }
+
+      Future<ProcessResult> run() => Process.run(
+              bin,
+              [
+                '-f', 'bestaudio/best',
+                '--no-playlist',
+                '--no-warnings',
+                '--no-progress',
+                '--socket-timeout', '20',
+                '--retries', '3',
+                '-o', '${dir.path}/$videoId.%(ext)s',
+                'https://www.youtube.com/watch?v=$videoId',
+              ],
+              stdoutEncoding: utf8,
+              stderrEncoding: utf8)
+          .timeout(const Duration(seconds: 120));
+
+      var result = await run();
+      if (result.exitCode != 0 && bin != 'yt-dlp' && binary == null) {
+        // an outdated yt-dlp is the usual reason: update it once and retry
+        try {
+          await Process.run(bin, ['-U']).timeout(const Duration(seconds: 90));
+        } catch (_) {}
+        result = await run();
+      }
+      if (result.exitCode != 0) {
+        final lines = '${result.stderr}'.trim().split('\n');
+        errors.add('yt-dlp: ${lines.isEmpty ? 'failed' : lines.last}');
+        return null;
+      }
+      found = _findAudioFile(dir, videoId);
+      if (found == null) {
+        errors.add('yt-dlp: finished but no audio file was created');
+        return null;
+      }
+      final problem = await _checkAudioFile(found);
+      if (problem != null) {
+        errors.add('yt-dlp: $problem');
+        await found.delete();
+        return null;
+      }
+      _pruneDir(dir, keep: found.path);
+      return [_audioFor(found)];
+    } catch (e) {
+      errors.add('yt-dlp: $e');
+      return null;
+    }
+  }
+
+  static File? _findAudioFile(Directory dir, String videoId) {
+    try {
+      final files = dir.listSync().whereType<File>().where((f) {
+        final name = f.uri.pathSegments.last;
+        return name.startsWith('$videoId.') &&
+            !name.endsWith('.part') &&
+            !name.endsWith('.ytdl');
+      }).toList();
+      if (files.isEmpty) return null;
+      files.sort((a, b) => b.lengthSync().compareTo(a.lengthSync()));
+      return files.first;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// null when [file] looks like complete, real audio.
+  static Future<String?> _checkAudioFile(File file) async {
+    final length = await file.length();
+    if (length < 10 * 1024) return 'downloaded file is too small ($length bytes)';
+    final raf = await file.open();
+    try {
+      final head = await raf.read(64);
+      final bad = StreamProxy.notAudioReason(head);
+      return bad == null ? null : 'downloaded file is $bad';
+    } finally {
+      await raf.close();
+    }
+  }
+
+  static Audio _audioFor(File file) {
+    final isOpus = file.path.toLowerCase().endsWith('.webm') ||
+        file.path.toLowerCase().endsWith('.opus');
+    return Audio(
+      itag: isOpus ? 251 : 140,
+      audioCodec: isOpus ? Codec.opus : Codec.mp4a,
+      bitrate: 0,
+      duration: 0,
+      loudnessDb: -5.0,
+      url: file.path,
+      size: file.lengthSync(),
+    );
+  }
+
+  static void _pruneDir(Directory dir, {required String keep}) {
+    try {
+      final files = dir.listSync().whereType<File>().where((f) => f.path != keep).toList()
+        ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      for (final f in files.skip(5)) {
+        f.deleteSync();
+      }
+    } catch (_) {}
+  }
 }

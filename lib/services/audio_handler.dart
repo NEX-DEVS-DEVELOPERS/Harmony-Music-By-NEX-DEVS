@@ -285,6 +285,14 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
     final originalUrl = mediaItem.extras!['url'] as String;
 
+    // File already downloaded by yt-dlp: just play it.
+    if (!originalUrl.startsWith('http') &&
+        originalUrl.contains('harmony_stream') &&
+        File(originalUrl).existsSync()) {
+      isPlayingUsingLockCachingSource = false;
+      return AudioSource.uri(Uri.file(originalUrl), tag: mediaItem);
+    }
+
     // Desktop: download the audio to a temp file first and play the file. This
     // is far more reliable than streaming from YouTube's servers (any failure
     // surfaces as a clear error) and gives instant seeking.

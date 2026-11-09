@@ -197,8 +197,18 @@ class StreamProxy {
         }
         final response = await request.close();
         if (response.statusCode >= 400) {
-          await response.drain();
-          throw HttpException('upstream HTTP ${response.statusCode}');
+          // keep a short piece of the body: servers often say why they refuse
+          final body = await response
+              .take(1)
+              .fold<List<int>>([], (a, b) => a..addAll(b.take(80)));
+          final text = String.fromCharCodes(
+                  body.map((b) => (b >= 32 && b < 127) ? b : 32))
+              .trim();
+          throw HttpException(
+              'upstream HTTP ${response.statusCode} [${upstream.host.split('.').first}, '
+              'c=${upstream.queryParameters['c'] ?? '?'}, '
+              '${useQuery ? 'range param' : 'Range header'} $from-$to'
+              '${text.isEmpty ? '' : ', says: $text'}]');
         }
         final builder = BytesBuilder(copy: false);
         await for (final data in response) {

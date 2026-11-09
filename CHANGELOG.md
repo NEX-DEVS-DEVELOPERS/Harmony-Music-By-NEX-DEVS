@@ -1,4 +1,6 @@
 # 1.12.5
+* **yt-dlp now downloads the song itself** (Windows/Linux): instead of only asking yt-dlp for a link and fetching it with our own code (which YouTube kept refusing with HTTP 403), yt-dlp downloads the audio file and Harmony plays that file. Files are checked to be real, complete audio, reused for repeat plays, and only the 5 newest are kept. 
+* Download errors now say exactly what failed: which server, which client, which byte range and what the server said.
 * **Root cause of "upstream HTTP 403"**: in Aug 2026 YouTube stopped serving audio to the client the library uses by default (`androidSdkless`), so a stream could be *found* but its real download was refused ([youtube_explode_dart#386](https://github.com/Hexer10/youtube_explode_dart/issues/386)). On Windows/Linux the app now asks `yt-dlp` first (it is updated within days of such changes), then YouTube directly, then Piped/Invidious. Every source is verified with a real range request, including one from the middle of the file, before it is used.
 
 # 1.12.4

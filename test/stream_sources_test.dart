@@ -86,7 +86,7 @@ void main() {
     });
     final base = 'http://127.0.0.1:${s.port}';
     expect(await StreamProxy.instance.validate('$base/ok'), isNull);
-    expect(await StreamProxy.instance.validate('$base/forbidden'), 'HTTP 403');
+    expect(await StreamProxy.instance.validate('$base/forbidden'), startsWith('HTTP 403'));
     expect(await StreamProxy.instance.validate('$base/empty'), 'empty response');
     await s.close(force: true);
   });
