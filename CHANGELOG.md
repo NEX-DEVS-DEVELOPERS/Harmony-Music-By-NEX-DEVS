@@ -1,4 +1,6 @@
 # 1.12.4
+* **Reliable playback**: audio is now played/downloaded through a small built-in local proxy that fetches YouTube streams in chunks like youtube_explode_dart does (YouTube rejects whole-file requests, which left songs stuck at 0:00). Playback errors are now shown on screen instead of failing silently.
+* Listen & identify (mic) button is now on the desktop search bar too.
 * **Headset / media keys (Windows)**: play/pause, next (double tap) and previous buttons on a headset or keyboard now control Harmony only; Harmony claims the keys with Windows so a browser tab playing video can't take them. Can be turned off in Settings -> "Headset & media keys".
 * **Windows installer upgrades in place**: uses the same install ID and folder as the original Harmony installer, so running it replaces the old version and keeps your library, playlists and settings (stored in %APPDATA%).
 * **Listen & identify (Shazam-style)**: tap the mic in the search box, let the app listen for ~8 seconds, and it identifies the song (AudD), searches it and plays it from the part you were listening to. Needs a free AudD API token, entered once in the dialog and stored only on the device.

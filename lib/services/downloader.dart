@@ -1,4 +1,4 @@
-import 'constant.dart';
+import 'stream_proxy.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -197,12 +197,13 @@ class Downloader extends GetxService {
     printINFO("Downloading filePath: $filePath");
     final totalBytes = requiredAudioStream.size;
 
+    // Download through the local chunking proxy (YouTube rejects/throttles
+    // whole-file requests).
+    final downloadUrl =
+        await StreamProxy.instance.proxify(requiredAudioStream.url);
     _dio.download(
-        requiredAudioStream.url,
-        options: Options(headers: {
-          "Range": 'bytes=0-$totalBytes',
-          "User-Agent": streamUserAgent,
-        }),
+        downloadUrl,
+        options: Options(headers: {"Range": 'bytes=0-$totalBytes'}),
         filePath, onReceiveProgress: (count, total) {
       if (total <= 0) return;
       songDownloadingProgress.value = ((count / total) * 100).toInt();

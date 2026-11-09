@@ -17,7 +17,7 @@ import 'package:rxdart/rxdart.dart';
 import '/models/album.dart';
 import '../models/playlist.dart';
 import '/services/equalizer.dart';
-import 'constant.dart';
+import 'stream_proxy.dart';
 import '../utils/smart_shuffle.dart';
 import '/services/stream_service.dart';
 import '/models/hm_streaming_data.dart';
@@ -168,6 +168,10 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
       if (e is PlayerException) {
         printERROR('Error code: ${e.code}');
         printERROR('Error message: ${e.message}');
+        try {
+          Get.find<PlayerController>()
+              .notifyPlayError('Playback error (${e.code}): ${e.message}');
+        } catch (_) {}
       } else {
         printERROR('An error occurred: $e');
         Duration curPos = _player.position;
@@ -278,17 +282,18 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     queue.add(newQueue);
   }
 
-  AudioSource _createAudioSource(MediaItem mediaItem) {
-    final url = mediaItem.extras!['url'] as String;
-    if (url.contains('/cache') ||
+  Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
+    final originalUrl = mediaItem.extras!['url'] as String;
+    // Play YouTube streams through the local chunking proxy (see StreamProxy).
+    final url = await StreamProxy.instance.proxify(originalUrl);
+    if (originalUrl.contains('/cache') ||
         (Get.find<SettingsScreenController>().cacheSongs.isTrue &&
-            url.contains("http"))) {
+            originalUrl.contains("http"))) {
       printINFO("Playing Using LockCaching");
       isPlayingUsingLockCachingSource = true;
       return LockCachingAudioSource(
         Uri.parse(url),
         cacheFile: File("$_cacheDir/cachedSongs/${mediaItem.id}.mp3"),
-        headers: {'User-Agent': streamUserAgent},
         tag: mediaItem,
       );
     }
@@ -297,7 +302,6 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
     isPlayingUsingLockCachingSource = false;
     return AudioSource.uri(
       Uri.tryParse(url)!,
-      headers: url.startsWith('http') ? {'User-Agent': streamUserAgent} : null,
       tag: mediaItem,
     );
   }
@@ -487,7 +491,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currentSongUrl = currentSong.extras!['url'] = streamInfo.audio!.url;
         playbackState
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
-        await _playList.add(_createAudioSource(currentSong));
+        await _playList.add(await _createAudioSource(currentSong));
 
         isSongLoading = false;
         if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
@@ -565,7 +569,7 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         }
         currentSongUrl = currMed.extras!['url'] = streamInfo.audio!.url;
 
-        await _playList.add(_createAudioSource(currMed));
+        await _playList.add(await _createAudioSource(currMed));
         isSongLoading = false;
 
         // Normalize audio
