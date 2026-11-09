@@ -250,4 +250,45 @@ class StreamProxy {
       return e.toString().replaceAll('\n', ' ');
     }
   }
+
+  /// Downloads the whole stream to [path] (in [chunk]-sized range requests) and
+  /// returns the file. Throws with the real reason (e.g. "upstream HTTP 403")
+  /// if it fails, so the UI can show it.
+  Future<File> downloadToFile(String url, String path,
+      {int chunk = 1024 * 1024,
+      void Function(int received, int total)? onProgress}) async {
+    final upstream = Uri.parse(url);
+    final total = int.tryParse(upstream.queryParameters['clen'] ?? '') ??
+        _sizeFor[url] ??
+        await _probeLength(upstream);
+    if (total == null || total <= 0) {
+      throw const HttpException('could not determine the audio size');
+    }
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    final tmp = File('$path.part');
+    final sink = tmp.openWrite();
+    try {
+      var pos = 0;
+      while (pos < total) {
+        final to = (pos + chunk - 1).clamp(pos, total - 1);
+        final bytes = await _fetchChunk(upstream, pos, to);
+        if (bytes.isEmpty) {
+          throw const HttpException('server returned no data');
+        }
+        sink.add(bytes);
+        pos += bytes.length;
+        onProgress?.call(pos, total);
+      }
+      await sink.close();
+      if (await file.exists()) await file.delete();
+      return await tmp.rename(path).then((f) => File(f.path));
+    } catch (e) {
+      try {
+        await sink.close();
+        if (await tmp.exists()) await tmp.delete();
+      } catch (_) {}
+      rethrow;
+    }
+  }
 }

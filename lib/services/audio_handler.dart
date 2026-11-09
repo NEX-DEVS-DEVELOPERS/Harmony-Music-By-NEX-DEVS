@@ -284,7 +284,23 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
 
   Future<AudioSource> _createAudioSource(MediaItem mediaItem) async {
     final originalUrl = mediaItem.extras!['url'] as String;
-    // Play YouTube streams through the local chunking proxy (see StreamProxy).
+
+    // Desktop: download the audio to a temp file first and play the file. This
+    // is far more reliable than streaming from YouTube's servers (any failure
+    // surfaces as a clear error) and gives instant seeking.
+    if ((GetPlatform.isWindows || GetPlatform.isLinux) &&
+        originalUrl.startsWith('http')) {
+      Get.find<PlayerController>().showLoadingStatus('Loading audio...');
+      final dir = Directory('$_cacheDir/streamTmp');
+      final file = await StreamProxy.instance
+          .downloadToFile(originalUrl, '${dir.path}/${mediaItem.id}.audio');
+      _pruneStreamTmp(dir, keep: file.path);
+      printINFO("Playing from downloaded file ${file.path}");
+      isPlayingUsingLockCachingSource = false;
+      return AudioSource.uri(Uri.file(file.path), tag: mediaItem);
+    }
+
+    // Mobile: play YouTube streams through the local chunking proxy.
     final url = await StreamProxy.instance.proxify(originalUrl);
     if (originalUrl.contains('/cache') ||
         (Get.find<SettingsScreenController>().cacheSongs.isTrue &&
@@ -492,7 +508,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         currentSongUrl = currentSong.extras!['url'] = streamInfo.audio!.url;
         playbackState
             .add(playbackState.value.copyWith(queueIndex: currentIndex));
-        await _playList.add(await _createAudioSource(currentSong));
+        final source = await _createAudioSourceSafe(currentSong);
+        if (source == null) return;
+        await _playList.add(source);
 
         isSongLoading = false;
         if (loudnessNormalizationEnabled && GetPlatform.isAndroid) {
@@ -571,7 +589,9 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
         _registerForProxy(streamInfo.audio);
         currentSongUrl = currMed.extras!['url'] = streamInfo.audio!.url;
 
-        await _playList.add(await _createAudioSource(currMed));
+        final source = await _createAudioSourceSafe(currMed);
+        if (source == null) return;
+        await _playList.add(source);
         isSongLoading = false;
 
         // Normalize audio
@@ -808,6 +828,41 @@ class MyAudioHandler extends BaseAudioHandler with GetxServiceMixin {
   }
 
 // Work around used [useNewInstanceOfExplode = false] to Fix Connection closed before full header was received issue
+  /// Keep only the few most recent downloaded songs in the temp folder.
+  void _pruneStreamTmp(Directory dir, {required String keep}) {
+    try {
+      final files = dir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.audio') && f.path != keep)
+          .toList()
+        ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      for (final f in files.skip(6)) {
+        f.deleteSync();
+      }
+    } catch (_) {}
+  }
+
+  /// Creates the audio source, turning any failure into an on-screen message.
+  /// Returns null when it failed (state is already updated).
+  Future<AudioSource?> _createAudioSourceSafe(MediaItem item) async {
+    try {
+      return await _createAudioSource(item);
+    } catch (e) {
+      printERROR('Could not load audio: $e');
+      isSongLoading = false;
+      currentSongUrl = null;
+      try {
+        Get.find<PlayerController>()
+            .notifyPlayError('Could not load the audio: $e');
+      } catch (_) {}
+      playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          errorMessage: '$e'));
+      return null;
+    }
+  }
+
   /// Never lets a failed lookup leave the player stuck without a message.
   Future<HMStreamingData> _safeStreamInfo(Future<HMStreamingData> f) async {
     try {
